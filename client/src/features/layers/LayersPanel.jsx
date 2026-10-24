@@ -1,0 +1,297 @@
+import { useRef } from 'react';
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  Bold,
+  Circle,
+  Copy,
+  Eye,
+  EyeOff,
+  ImagePlus,
+  Italic,
+  Minus,
+  Square,
+  Trash2,
+  Type,
+} from 'lucide-react';
+import { BLEND_MODES, FONTS } from '../../engine/layers.js';
+import { ACCEPT_ATTR, firstImageFile } from '../../lib/image.js';
+import { useToast } from '../../components/Toaster.jsx';
+import { Panel, cx } from '../../components/ui.jsx';
+import { ColorField, RangeField, ToggleRow } from '../../components/fields.jsx';
+import { useLayerActions } from './useLayerActions.js';
+
+const TYPE_ICONS = { text: Type, image: ImagePlus };
+const SHAPE_ICONS = { rect: Square, ellipse: Circle, line: Minus, arrow: ArrowRight };
+const iconFor = (layer) => (layer.type === 'shape' ? SHAPE_ICONS[layer.shape] : TYPE_ICONS[layer.type]);
+
+const pct = (v) => `${Math.round(v * 100)}%`;
+
+function AddButton({ label, icon: Icon, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="hairline flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-ink-700 text-[11px] font-bold hover:bg-ink-600"
+    >
+      <Icon className="size-4" />
+    </button>
+  );
+}
+
+export function LayersPanel() {
+  const toast = useToast();
+  const { layers, selected, select, addText, addShape, addImage, remove, duplicate, reorder, update, previewUpdate, commit } = useLayerActions();
+  const fileRef = useRef(null);
+
+  const onImage = async (file) => {
+    try {
+      await addImage(file);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  // Live while dragging/typing; one undo step when the control is released.
+  const live = (patch) => previewUpdate(selected.id, patch);
+  const set = (patch) => update(selected.id, patch);
+
+  return (
+    <Panel className="scrollbar-none flex min-h-0 flex-col overflow-y-auto p-5">
+      <h2 className="text-[19px] font-bold tracking-tight">Layers</h2>
+      <p className="mt-1 text-[12px] text-white/45">Text, shapes and photos on top of your edit.</p>
+
+      <div className="mt-5 flex gap-2">
+        <AddButton label="Add text (T)" icon={Type} onClick={addText} />
+        <AddButton label="Add rectangle" icon={Square} onClick={() => addShape('rect')} />
+        <AddButton label="Add ellipse" icon={Circle} onClick={() => addShape('ellipse')} />
+        <AddButton label="Add arrow" icon={ArrowRight} onClick={() => addShape('arrow')} />
+        <AddButton label="Add line" icon={Minus} onClick={() => addShape('line')} />
+        <AddButton label="Add photo or logo" icon={ImagePlus} onClick={() => fileRef.current?.click()} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ACCEPT_ATTR}
+          hidden
+          onChange={(e) => {
+            const file = firstImageFile(e.target.files);
+            if (file) onImage(file);
+            e.target.value = '';
+          }}
+        />
+      </div>
+
+      {layers.length === 0 ? (
+        <p className="mt-6 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-[12px] leading-relaxed text-white/40">
+          No layers yet. Add text, a shape or a photo.
+          <br />
+          Drag on the canvas to move, use the handles to resize and rotate.
+        </p>
+      ) : (
+        <ul className="mt-5 space-y-1" aria-label="Layers, top first">
+          {[...layers].reverse().map((layer) => {
+            const Icon = iconFor(layer);
+            const isSelected = selected?.id === layer.id;
+            const index = layers.indexOf(layer);
+            return (
+              <li key={layer.id}>
+                <div
+                  className={cx(
+                    'group flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors',
+                    isSelected ? 'bg-ink-700 ring-1 ring-sky/60' : 'hover:bg-white/[0.04]',
+                  )}
+                >
+                  <button type="button" onClick={() => select(layer.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                    <Icon className={cx('size-4 shrink-0', layer.hidden ? 'text-white/25' : 'text-white/70')} />
+                    <span className={cx('truncate text-[12px] font-semibold', layer.hidden && 'text-white/35')}>
+                      {layer.type === 'text' ? layer.text.split('\n')[0] || 'Text' : layer.name}
+                    </span>
+                  </button>
+                  <div className={cx('flex shrink-0 gap-0.5', !isSelected && 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100')}>
+                    <IconAction label="Bring forward" disabled={index === layers.length - 1} onClick={() => reorder(layer.id, 1)} icon={ArrowUp} />
+                    <IconAction label="Send backward" disabled={index === 0} onClick={() => reorder(layer.id, -1)} icon={ArrowDown} />
+                    <IconAction label="Duplicate" onClick={() => duplicate(layer.id)} icon={Copy} />
+                    <IconAction label="Delete" onClick={() => remove(layer.id)} icon={Trash2} />
+                  </div>
+                  <IconAction
+                    label={layer.hidden ? 'Show' : 'Hide'}
+                    onClick={() => update(layer.id, { hidden: !layer.hidden })}
+                    icon={layer.hidden ? EyeOff : Eye}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {selected && (
+        <section className="mt-5 space-y-4 border-t border-white/5 pt-5" aria-label="Layer properties">
+          {selected.type === 'text' && <TextProperties layer={selected} live={live} set={set} commit={commit} />}
+          {selected.type === 'shape' && <ShapeProperties layer={selected} live={live} set={set} commit={commit} />}
+
+          <RangeField label="Opacity" value={selected.opacity} min={0} max={1} step={0.01} format={pct} onChange={(opacity) => live({ opacity })} onCommit={commit} />
+          <RangeField
+            label="Rotation"
+            value={selected.rotation}
+            min={-180}
+            max={180}
+            step={1}
+            format={(v) => `${v}°`}
+            onChange={(rotation) => live({ rotation })}
+            onCommit={commit}
+          />
+          <label className="block">
+            <span className="text-[12px] font-semibold text-white/70">Blend</span>
+            <select
+              value={selected.blend}
+              onChange={(e) => set({ blend: e.target.value })}
+              className="mt-1.5 h-9 w-full rounded-xl bg-ink-950 px-3 text-base font-semibold ring-1 lg:text-[12px] ring-white/10 outline-none focus:ring-sky"
+            >
+              {BLEND_MODES.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      )}
+    </Panel>
+  );
+}
+
+function IconAction({ label, icon: Icon, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="grid size-7 place-items-center rounded-lg text-white/55 hover:bg-white/5 hover:text-white disabled:opacity-25"
+    >
+      <Icon className="size-3.5" />
+    </button>
+  );
+}
+
+function TextProperties({ layer, live, set, commit }) {
+  const font = FONTS.find((f) => f.key === layer.font) ?? FONTS[0];
+  const bold = layer.weight >= 700;
+
+  return (
+    <>
+      <label className="block">
+        <span className="text-[12px] font-semibold text-white/70">Text</span>
+        <textarea
+          id="layer-text"
+          rows={2}
+          value={layer.text}
+          onChange={(e) => live({ text: e.target.value })}
+          onBlur={commit}
+          className="mt-1.5 w-full resize-y rounded-xl bg-ink-950 px-3 py-2 text-base ring-1 lg:text-[13px] ring-white/10 outline-none focus:ring-sky"
+        />
+      </label>
+
+      <div className="grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Font">
+        {FONTS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            role="radio"
+            aria-checked={layer.font === f.key}
+            onClick={() => set({ font: f.key })}
+            title={f.label}
+            className={cx(
+              'h-10 rounded-xl text-[15px] transition-colors',
+              layer.font === f.key ? 'bg-white text-ink-950' : 'bg-ink-700 text-white/75 hover:text-white',
+            )}
+            style={{ fontFamily: `"${f.family}"` }}
+          >
+            Aa
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <ToggleRow
+          label="Alignment"
+          value={layer.align}
+          onChange={(align) => set({ align })}
+          options={[
+            { value: 'left', icon: AlignLeft, title: 'Align left' },
+            { value: 'center', icon: AlignCenter, title: 'Centre' },
+            { value: 'right', icon: AlignRight, title: 'Align right' },
+          ]}
+        />
+        <div className="flex rounded-xl bg-ink-950 p-1">
+          <StyleToggle label="Bold" icon={Bold} active={bold} disabled={font.weights.length === 1} onClick={() => set({ weight: bold ? 400 : 800 })} />
+          <StyleToggle label="Italic" icon={Italic} active={layer.italic} onClick={() => set({ italic: !layer.italic })} />
+        </div>
+      </div>
+
+      <RangeField label="Size" value={layer.size} min={0.02} max={0.3} step={0.002} format={(v) => `${(v * 100).toFixed(1)}%`} onChange={(size) => live({ size })} onCommit={commit} />
+      <RangeField label="Letter spacing" value={layer.letterSpacing} min={-0.05} max={0.4} step={0.01} format={(v) => v.toFixed(2)} onChange={(letterSpacing) => live({ letterSpacing })} onCommit={commit} />
+      <ColorField label="Colour" value={layer.color} onChange={(color) => set({ color })} onLive={(color) => live({ color })} onCommit={commit} />
+      <RangeField label="Outline" value={layer.strokeWidth} min={0} max={0.15} step={0.005} format={pct} onChange={(strokeWidth) => live({ strokeWidth })} onCommit={commit} />
+      {layer.strokeWidth > 0 && <ColorField label="Outline colour" value={layer.strokeColor} onChange={(strokeColor) => set({ strokeColor })} onLive={(strokeColor) => live({ strokeColor })} onCommit={commit} />}
+      <label className="flex items-center justify-between text-[12px] font-semibold text-white/70">
+        Drop shadow
+        <input type="checkbox" checked={layer.shadow} onChange={(e) => set({ shadow: e.target.checked })} className="size-4 accent-[var(--color-sky)]" />
+      </label>
+    </>
+  );
+}
+
+function StyleToggle({ label, icon: Icon, active, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={onClick}
+      className={cx('grid h-8 w-9 place-items-center rounded-lg disabled:opacity-30', active ? 'bg-ink-700 text-white' : 'text-white/45 hover:text-white')}
+    >
+      <Icon className="size-3.5" />
+    </button>
+  );
+}
+
+function ShapeProperties({ layer, live, set, commit }) {
+  const linear = layer.shape === 'line' || layer.shape === 'arrow';
+  return (
+    <>
+      {!linear && <ColorField label="Fill" value={layer.fill} allowNone onChange={(fill) => set({ fill })} onLive={(fill) => live({ fill })} onCommit={commit} />}
+      <ColorField
+        label={linear ? 'Colour' : 'Outline'}
+        value={layer.stroke}
+        allowNone={!linear}
+        onChange={(stroke) => set({ stroke })}
+        onLive={(stroke) => live({ stroke })}
+        onCommit={commit}
+      />
+      <RangeField
+        label={linear ? 'Thickness' : 'Outline width'}
+        value={layer.strokeWidth}
+        min={0}
+        max={0.05}
+        step={0.001}
+        format={(v) => `${(v * 100).toFixed(1)}%`}
+        onChange={(strokeWidth) => live({ strokeWidth })}
+        onCommit={commit}
+      />
+      {layer.shape === 'rect' && (
+        <RangeField label="Corner radius" value={layer.radius} min={0} max={0.5} step={0.01} format={pct} onChange={(radius) => live({ radius })} onCommit={commit} />
+      )}
+    </>
+  );
+}

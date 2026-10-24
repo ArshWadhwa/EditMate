@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EditMate — Editor design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Manrope', 'system-ui'], mono: ['JetBrains Mono', 'monospace'] },
+        colors: {
+          ink: { 950: '#070708', 900: '#0d0d0f', 850: '#141416', 800: '#1b1b1e', 700: '#232327', 600: '#2e2e33', 500: '#45454c' },
+          accent: '#f4d35e', sky: '#5ac8fa', rec: '#e5484d',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { background: radial-gradient(1200px 600px at 20% -10%, #24242a 0%, #0a0a0b 55%); }
+  .glass { background: linear-gradient(180deg, rgba(20,20,22,.62), rgba(20,20,22,.38)); backdrop-filter: blur(18px) saturate(140%); }
+  .hairline { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  .label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.42); font-weight: 600; }
+  .num { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  .track { height: 2px; background: rgba(255,255,255,.12); border-radius: 9px; position: relative; }
+  .track .fill { position: absolute; top: 0; bottom: 0; background: #fff; border-radius: 9px; }
+  .track .thumb { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 99px; background: #4a4a52; transform: translate(-50%,-50%); box-shadow: 0 0 0 3px #1b1b1e; }
+  .track .zero { position: absolute; left: 50%; top: -4px; width: 1px; height: 10px; background: rgba(255,255,255,.25); }
+  .row:hover .thumb { background: #fff; }
+  .after { filter: saturate(1.28) contrast(1.1) sepia(.18) brightness(1.03); }
+  .before { filter: saturate(.8) brightness(.96); }
+</style>
+</head>
+<body class="min-h-screen font-sans text-white antialiased p-6">
+<div class="mx-auto max-w-[1440px] h-[860px] rounded-[30px] bg-ink-900 hairline p-3 flex gap-3">
+
+  <!-- Rail -->
+  <nav class="w-[68px] shrink-0 rounded-[22px] bg-ink-850 flex flex-col items-center py-4">
+    <div class="h-9 w-11 rounded-lg bg-ink-950 hairline grid place-items-center text-[13px] font-extrabold tracking-tight">EM</div>
+    <div class="mt-10 flex flex-col gap-3">
+      <button class="h-11 w-11 rounded-full grid place-items-center text-white/45 hover:text-white"><i data-lucide="image-up" class="h-[18px]"></i></button>
+      <button class="h-11 w-11 rounded-full grid place-items-center bg-white text-ink-950"><i data-lucide="sliders-horizontal" class="h-[18px]"></i></button>
+      <button class="h-11 w-11 rounded-full grid place-items-center text-white/45 hover:text-white"><i data-lucide="crop" class="h-[18px]"></i></button>
+      <button class="h-11 w-11 rounded-full grid place-items-center text-white/45 hover:text-white"><i data-lucide="sparkles" class="h-[18px]"></i></button>
+      <button class="h-11 w-11 rounded-full grid place-items-center text-white/45 hover:text-white"><i data-lucide="bookmark" class="h-[18px]"></i></button>
+    </div>
+    <div class="my-6 h-px w-8 bg-white/10"></div>
+    <div class="flex flex-col gap-3">
+      <button class="h-11 w-11 rounded-full grid place-items-center text-white/45 hover:text-white"><i data-lucide="undo-2" class="h-[18px]"></i></button>
+      <button class="h-11 w-11 rounded-full grid place-items-center text-white/45 hover:text-white"><i data-lucide="redo-2" class="h-[18px]"></i></button>
+      <button class="h-11 w-11 rounded-full grid place-items-center text-white/45 hover:text-white"><i data-lucide="keyboard" class="h-[18px]"></i></button>
+    </div>
+    <div class="mt-auto flex flex-col items-center gap-2">
+      <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]"></span>
+      <span class="label !text-[8px]">API</span>
+    </div>
+  </nav>
+
+  <!-- Main grid -->
+  <main class="flex-1 grid grid-cols-[1fr_340px] grid-rows-[1fr_236px] gap-3 min-w-0">
+
+    <!-- Viewport -->
+    <section class="relative rounded-[22px] overflow-hidden bg-ink-950">
+      <img class="before absolute inset-0 h-full w-full object-cover" src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1800&q=80" alt="" />
+      <div class="absolute inset-0" style="clip-path: inset(0 0 0 58%)">
+        <img class="after absolute inset-0 h-full w-full object-cover" src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1800&q=80" alt="" />
+      </div>
+
+      <!-- thirds grid -->
+      <div class="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
+        <div class="border-r border-b border-white/10"></div><div class="border-r border-b border-white/10"></div><div class="border-b border-white/10"></div>
+        <div class="border-r border-b border-white/10"></div><div class="border-r border-b border-white/10"></div><div class="border-b border-white/10"></div>
+        <div class="border-r border-white/10"></div><div class="border-r border-white/10"></div><div></div>
+      </div>
+
+      <!-- compare divider -->
+      <div class="absolute inset-y-0 left-[58%] w-px bg-white/80">
+        <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-10 w-10 rounded-full glass hairline grid place-items-center shadow-xl">
+          <i data-lucide="chevrons-left-right" class="h-4"></i>
+        </div>
+      </div>
+      <span class="absolute bottom-5 left-[calc(58%-78px)] label !text-white/80">Before</span>
+      <span class="absolute bottom-5 left-[calc(58%+18px)] label !text-white/80">After</span>
+
+      <!-- white balance sampler -->
+      <div class="absolute left-[76%] top-[38%] h-16 w-16 border border-accent/90 rounded-sm">
+        <i data-lucide="pipette" class="absolute -top-3 left-1/2 -translate-x-1/2 h-4 text-accent"></i>
+      </div>
+
+      <!-- left HUD strip -->
+      <aside class="glass absolute inset-y-0 left-0 w-[208px] p-5 flex flex-col border-r border-white/5">
+        <div class="flex items-center gap-2">
+          <span class="rounded-md border border-white/40 px-2.5 py-1 text-[11px] font-bold tracking-wider">EDITED</span>
+          <span class="rounded-md bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/60">JPEG</span>
+        </div>
+        <p class="mt-4 text-[12px] font-semibold"><span class="text-accent">4032 × 3024</span> <span class="text-white/50">· 12.2 MP</span></p>
+
+        <p class="label mt-7">Zoom</p>
+        <div class="mt-3 flex items-center gap-3">
+          <div class="track flex-1"><div class="fill" style="left:0;width:38%"></div><div class="thumb !bg-white !w-2.5 !h-2.5" style="left:38%"></div></div>
+          <span class="num text-[11px] text-white/60">62%</span>
+        </div>
+        <button class="mt-3 w-fit rounded-md border border-white/20 px-2 py-0.5 text-[10px] font-bold text-white/70">FIT</button>
+
+        <p class="label mt-7">Channels</p>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button class="rounded-md bg-white/10 px-3 py-1.5 text-[11px] font-bold flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-red-400"></span>R</button>
+          <button class="rounded-md bg-white/10 px-3 py-1.5 text-[11px] font-bold flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-green-400"></span>G</button>
+          <button class="rounded-md bg-white/10 px-3 py-1.5 text-[11px] font-bold flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-blue-400"></span>B</button>
+          <button class="rounded-md bg-white/25 px-3 py-1.5 text-[11px] font-bold flex items-center gap-2 ring-1 ring-white/40"><span class="h-1.5 w-1.5 rounded-full bg-white"></span>L</button>
+        </div>
+
+        <div class="mt-auto">
+          <div class="relative h-[120px] border border-white/25 rounded-sm">
+            <span class="absolute -top-2.5 left-2 bg-transparent px-1 text-[12px] font-bold">EV +0.35</span>
+            <svg id="histogram" viewBox="0 0 256 100" preserveAspectRatio="none" class="absolute inset-x-1 bottom-1 h-[86px] w-[calc(100%-8px)]"></svg>
+          </div>
+          <div class="mt-2 flex justify-between num text-[10px] text-white/40"><span>0</span><span>clip 0.4%</span><span>255</span></div>
+        </div>
+      </aside>
+
+      <!-- top-right controls -->
+      <div class="absolute right-5 top-5 flex items-center gap-2">
+        <button class="glass hairline h-10 px-4 rounded-xl flex items-center gap-2 text-[12px] font-semibold"><i data-lucide="grid-3x3" class="h-4"></i>Grid</button>
+        <button class="glass hairline h-10 px-4 rounded-xl flex items-center gap-2 text-[12px] font-semibold ring-1 ring-white/40"><i data-lucide="columns-2" class="h-4"></i>Compare</button>
+        <button class="h-10 px-4 rounded-xl bg-rec flex items-center gap-2 text-[12px] font-bold shadow-lg shadow-rec/30"><i data-lucide="download" class="h-4"></i>Export</button>
+      </div>
+      <div class="absolute right-5 top-[72px] glass hairline rounded-xl px-3 py-2 flex items-center gap-3">
+        <span class="h-1.5 w-1.5 rounded-full bg-rec animate-pulse"></span>
+        <span class="num text-[11px] text-white/75">14 edits · unsaved</span>
+      </div>
+    </section>
+
+    <!-- Right: adjustments -->
+    <section class="row-span-1 rounded-[22px] bg-ink-850 p-5 flex flex-col">
+      <div class="flex items-start justify-between">
+        <div>
+          <h2 class="text-[19px] font-bold tracking-tight">golden_coast.jpg</h2>
+          <p class="mt-1 text-[12px] text-white/45">JPEG · 4.8 MB · sRGB</p>
+        </div>
+        <img class="h-11 w-16 rounded-lg object-cover hairline" src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=200&q=60" alt="" />
+      </div>
+
+      <div class="mt-5 grid grid-cols-3 rounded-xl bg-ink-950 p-1 text-[12px] font-semibold">
+        <button class="rounded-lg bg-ink-700 py-2">Light</button>
+        <button class="rounded-lg py-2 text-white/45">Color</button>
+        <button class="rounded-lg py-2 text-white/45">Effects</button>
+      </div>
+
+      <div id="sliders" class="mt-6 flex-1 flex flex-col justify-around"></div>
+
+      <div class="mt-4 pt-4 border-t border-white/5 flex items-center justify-center gap-4">
+        <button class="h-12 w-12 rounded-full bg-ink-700 hairline grid place-items-center" title="Auto tone"><span class="text-[9px] font-extrabold leading-none text-center">AUTO</span></button>
+        <button class="h-12 w-12 rounded-full bg-ink-700 hairline grid place-items-center" title="Auto white balance"><i data-lucide="pipette" class="h-4"></i></button>
+        <button class="h-12 w-12 rounded-full bg-ink-700 hairline grid place-items-center" title="Save preset"><i data-lucide="bookmark-plus" class="h-4"></i></button>
+        <button class="h-12 w-12 rounded-full bg-ink-700 hairline grid place-items-center" title="Reset"><i data-lucide="rotate-ccw" class="h-4"></i></button>
+      </div>
+    </section>
+
+    <!-- Bottom: inspiration + control pad -->
+    <section class="rounded-[22px] bg-ink-850 p-4 flex gap-5 min-w-0">
+      <div class="flex flex-col w-[300px] shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="grid grid-cols-2 rounded-xl bg-ink-950 p-1 text-[12px] font-semibold">
+            <button class="rounded-lg bg-ink-700 px-4 py-1.5 flex items-center gap-2"><i data-lucide="sparkles" class="h-3.5"></i>Inspire</button>
+            <button class="rounded-lg px-4 py-1.5 text-white/45 flex items-center gap-2"><i data-lucide="bookmark" class="h-3.5"></i>Presets</button>
+          </div>
+        </div>
+        <div class="mt-3 flex-1 relative rounded-2xl overflow-hidden hairline">
+          <img class="absolute inset-0 h-full w-full object-cover" src="https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=700&q=70" alt="" />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent"></div>
+          <span class="absolute left-3 top-3 label !text-white/80">Reference</span>
+          <div class="absolute bottom-3 left-3 right-3 flex items-end justify-between">
+            <div>
+              <p class="text-[15px] font-bold">Golden hour</p>
+              <div class="mt-1.5 flex gap-1">
+                <span class="h-3 w-5 rounded-sm" style="background:#e9a54b"></span><span class="h-3 w-5 rounded-sm" style="background:#b3622f"></span><span class="h-3 w-5 rounded-sm" style="background:#5b3a2b"></span><span class="h-3 w-5 rounded-sm" style="background:#f3d9a4"></span><span class="h-3 w-5 rounded-sm" style="background:#2a2422"></span>
+              </div>
+            </div>
+            <span class="rounded-md bg-sky/90 text-ink-950 px-2 py-0.5 text-[11px] font-extrabold num">92% match</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 grid grid-cols-3 gap-x-6 content-center min-w-0">
+        <div class="flex flex-col gap-4 border-r border-white/5 pr-4">
+          <div><p class="label">Brightness</p><p class="num mt-1 text-[15px]">+5</p></div>
+          <div><p class="label">Contrast</p><p class="num mt-1 text-[15px]">+18</p></div>
+          <div><p class="label">Saturation</p><p class="num mt-1 text-[15px]">−8</p></div>
+        </div>
+        <div class="flex flex-col gap-4 border-r border-white/5 pr-4">
+          <div><p class="label">Warmth</p><p class="num mt-1 text-[15px] text-accent">+22</p></div>
+          <div><p class="label">Highlights</p><p class="num mt-1 text-[15px]">−25</p></div>
+          <div><p class="label">Grain</p><p class="num mt-1 text-[15px]">+12</p></div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <p class="label">Recipe strength</p>
+          <p class="num text-[22px] font-medium">80%</p>
+          <div class="track mt-1"><div class="fill" style="left:0;width:80%"></div><div class="thumb !bg-white" style="left:80%"></div></div>
+          <button class="mt-4 h-9 rounded-xl bg-white text-ink-950 text-[12px] font-extrabold">Apply recipe</button>
+          <p class="text-[11px] leading-snug text-white/40">Suggested for <em>your</em> photo, not copied from the reference.</p>
+        </div>
+      </div>
+
+      <!-- control pad -->
+      <div class="w-[196px] shrink-0 flex flex-col items-center">
+        <div class="flex gap-2">
+          <button class="h-10 w-12 rounded-full bg-ink-700 hairline text-[11px] font-bold">AWB</button>
+          <button class="h-10 w-12 rounded-full bg-ink-700 hairline text-[11px] font-bold">AUTO</button>
+        </div>
+        <div class="relative mt-2.5 h-[150px] w-[150px] rounded-full bg-ink-700 hairline">
+          <button class="absolute top-2.5 left-1/2 -translate-x-1/2 text-white/80"><i data-lucide="chevron-up" class="h-4"></i></button>
+          <button class="absolute bottom-2.5 left-1/2 -translate-x-1/2 text-white/80"><i data-lucide="chevron-down" class="h-4"></i></button>
+          <button class="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/80"><i data-lucide="chevron-left" class="h-4"></i></button>
+          <button class="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/80"><i data-lucide="chevron-right" class="h-4"></i></button>
+          <span class="absolute top-8 left-1/2 -translate-x-1/2 text-[9px] text-white/45 font-semibold">Warmth</span>
+          <div class="absolute inset-[38px] rounded-full bg-ink-900 shadow-inner grid place-items-center">
+            <span class="num text-[15px] font-medium text-accent">+22</span>
+          </div>
+          <span class="absolute bottom-8 left-1/2 -translate-x-1/2 text-[9px] text-white/45 font-semibold">nudge</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom-right: straighten dial -->
+    <section class="rounded-[22px] bg-ink-850 p-4 flex flex-col items-center relative overflow-hidden">
+      <span class="rounded-md bg-sky px-2.5 py-0.5 text-[12px] font-extrabold text-ink-950 num">+2.4°</span>
+      <svg id="dial" viewBox="0 0 200 200" class="mt-1 h-[160px] w-[160px]"></svg>
+      <div class="absolute bottom-3 inset-x-4 flex items-center justify-between">
+        <span class="num text-[10px] text-white/45">Crop 4:5 · 3024×3780</span>
+        <div class="flex gap-1.5">
+          <button class="h-7 w-7 rounded-full bg-ink-700 grid place-items-center"><i data-lucide="rotate-ccw-square" class="h-3.5"></i></button>
+          <button class="h-7 w-7 rounded-full bg-ink-700 grid place-items-center"><i data-lucide="flip-horizontal-2" class="h-3.5"></i></button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  // sliders
+  const rows = [
+    ['Brightness', 5], ['Contrast', 18], ['Highlights', -25], ['Shadows', 12], ['Fade', 0],
+  ];
+  document.getElementById('sliders').innerHTML = rows.map(([label, v]) => {
+    const pos = 50 + v / 2;
+    const left = Math.min(50, pos), width = Math.abs(pos - 50);
+    return `<div class="row">
+      <div class="flex items-center justify-between">
+        <span class="text-[13px] font-semibold ${v ? '' : 'text-white/55'}">${label}</span>
+        <span class="num text-[13px] ${v ? 'text-accent' : 'text-white/35'}">${v > 0 ? '+' : ''}${v}</span>
+      </div>
+      <div class="track mt-3"><div class="zero"></div><div class="fill" style="left:${left}%;width:${width}%"></div><div class="thumb" style="left:${pos}%"></div></div>
+    </div>`;
+  }).join('');
+
+  // histogram
+  const g = (x, m, s, a) => a * Math.exp(-((x - m) ** 2) / (2 * s * s));
+  const pts = Array.from({ length: 256 }, (_, x) =>
+    g(x, 40, 18, 45) + g(x, 110, 30, 70) + g(x, 170, 20, 90) + g(x, 215, 14, 55) + 6 * Math.sin(x * 0.7) ** 2);
+  const max = Math.max(...pts);
+  document.getElementById('histogram').innerHTML =
+    `<path fill="white" d="M0,100 ${pts.map((p, x) => `L${x},${100 - (p / max) * 96}`).join(' ')} L255,100 Z"/>`;
+
+  // straighten dial
+  const ticks = [];
+  for (let a = 0; a < 360; a += 3) {
+    const major = a % 30 === 0, r1 = 92, r2 = major ? 80 : 86, t = (a - 90) * Math.PI / 180;
+    ticks.push(`<line x1="${100 + r1 * Math.cos(t)}" y1="${100 + r1 * Math.sin(t)}" x2="${100 + r2 * Math.cos(t)}" y2="${100 + r2 * Math.sin(t)}" stroke="rgba(255,255,255,${major ? .7 : .25})" stroke-width="${major ? 1.4 : 1}"/>`);
+  }
+  const labels = [[0, '0'], [90, '+45'], [180, '±'], [270, '−45']].map(([a, l]) => {
+    const t = (a - 90) * Math.PI / 180;
+    return `<text x="${100 + 68 * Math.cos(t)}" y="${100 + 68 * Math.sin(t) + 3}" text-anchor="middle" font-size="9" font-family="JetBrains Mono" fill="rgba(255,255,255,.55)">${l}</text>`;
+  }).join('');
+  document.getElementById('dial').innerHTML = `
+    <circle cx="100" cy="100" r="96" fill="#111113" stroke="rgba(255,255,255,.08)"/>
+    ${ticks.join('')}${labels}
+    <circle cx="100" cy="100" r="40" fill="#1b1b1e" stroke="rgba(255,255,255,.1)"/>
+    <g transform="rotate(19 100 100)">
+      <path d="M100 66 L108 104 L100 98 L92 104 Z" fill="white"/>
+      <line x1="100" y1="8" x2="100" y2="20" stroke="#e5484d" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+    <text x="100" y="124" text-anchor="middle" font-size="8" letter-spacing="1.5" fill="rgba(255,255,255,.45)" font-family="Manrope" font-weight="700">STRAIGHTEN</text>`;
+
+  lucide.createIcons();
+</script>
+</body>
+</html>

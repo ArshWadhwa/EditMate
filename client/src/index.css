@@ -1,0 +1,181 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --color-ink-950: #070708;
+  --color-ink-900: #0d0d0f;
+  --color-ink-850: #141416;
+  --color-ink-800: #1b1b1e;
+  --color-ink-700: #232327;
+  --color-ink-600: #2e2e33;
+  --color-ink-500: #45454c;
+
+  --color-accent: #f4d35e;
+  --color-sky: #5ac8fa;
+  --color-rec: #e5484d;
+  --color-ok: #34d399;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 font-sans text-white antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    background-image: radial-gradient(1200px 600px at 15% -10%, #212126 0%, transparent 60%);
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-sky);
+    outline-offset: 2px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@utility glass {
+  background: linear-gradient(180deg, rgb(20 20 22 / 0.66), rgb(20 20 22 / 0.4));
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+@utility hairline {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+@utility label {
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.42);
+}
+
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Checkerboard shown behind transparent pixels. */
+@utility bg-checker {
+  background-color: #2a2a2e;
+  background-image:
+    linear-gradient(45deg, #3a3a40 25%, transparent 25%),
+    linear-gradient(-45deg, #3a3a40 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #3a3a40 75%),
+    linear-gradient(-45deg, transparent 75%, #3a3a40 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Range slider: 2px track, filled from zero (bipolar) or from min (unipolar). */
+.range {
+  --fill-from: 50%;
+  --fill-to: 50%;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 9px;
+  background: linear-gradient(
+    to right,
+    rgb(255 255 255 / 0.12) var(--fill-from),
+    #fff var(--fill-from),
+    #fff var(--fill-to),
+    rgb(255 255 255 / 0.12) var(--fill-to)
+  );
+}
+
+.range::-moz-range-track {
+  height: 2px;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 0.12);
+}
+
+.range::-moz-range-progress {
+  height: 2px;
+  background: transparent;
+}
+
+.range::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: #4a4a52;
+  box-shadow: 0 0 0 3px var(--color-ink-850);
+  transition: background 120ms, transform 120ms;
+}
+
+.range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #4a4a52;
+  box-shadow: 0 0 0 3px var(--color-ink-850);
+}
+
+.range:hover::-webkit-slider-thumb,
+.range:focus-visible::-webkit-slider-thumb,
+.range:active::-webkit-slider-thumb {
+  background: #fff;
+}
+
+.range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.range:hover::-moz-range-thumb,
+.range:focus-visible::-moz-range-thumb {
+  background: #fff;
+}
+
+.range:focus-visible {
+  outline: none;
+}
+
+.range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--color-ink-850), 0 0 0 5px var(--color-sky);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 180ms ease-out;
+}

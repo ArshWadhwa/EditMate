@@ -1,19 +1,19 @@
 import { drawLayer, needsMask } from './layers.js';
 
 /**
- * Final compositing stage, after the pixel pipeline:
- *
- *   backdrop (original photo | transparent | colour | image | blurred photo)
- *   → subject (photo masked by the segmentation alpha)
- *   → layers, bottom to top
- *
- * Runs with canvas 2D compositing, so it's GPU-accelerated in most browsers and cheap enough
- * to redo on every pointer move. The same function renders the preview and the export.
+ * 2D Canvas compositing engine for backgrounds, cutout masks, and overlay layers.
  */
 
 const scratch = new Map();
 
-/** Reusable offscreen canvas per purpose, resized on demand. */
+/**
+ * Retrieves or creates a pooled scratch canvas matching target dimensions.
+ *
+ * @param {string} key
+ * @param {number} width
+ * @param {number} height
+ * @returns {HTMLCanvasElement}
+ */
 function scratchCanvas(key, width, height) {
   let canvas = scratch.get(key);
   if (!canvas) {
@@ -27,6 +27,14 @@ function scratchCanvas(key, width, height) {
   return canvas;
 }
 
+/**
+ * Renders an image to fill the canvas maintaining aspect ratio (object-fit: cover).
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {CanvasImageSource & { width: number, height: number }} image
+ * @param {number} W
+ * @param {number} H
+ */
 function drawCover(ctx, image, W, H) {
   const scale = Math.max(W / image.width, H / image.height);
   const w = image.width * scale;
@@ -35,8 +43,13 @@ function drawCover(ctx, image, W, H) {
 }
 
 /**
- * Blurs `image` over the whole canvas using native hardware-accelerated canvas filter.
- * The radius is a fraction of the image size so preview and export look identical.
+ * Blurs an image onto the canvas using hardware-accelerated context filter.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {CanvasImageSource} image
+ * @param {number} W
+ * @param {number} H
+ * @param {number} amount - Blur radius percentage
  */
 function drawBlurred(ctx, image, W, H, amount) {
   const radius = (amount / 100) * 0.04 * Math.max(W, H);
@@ -48,13 +61,16 @@ function drawBlurred(ctx, image, W, H, amount) {
 }
 
 /**
- * @param {HTMLCanvasElement} target         resized to match `photo`
+ * Composites the final scene (backdrop -> subject cutout mask -> layer stack).
+ *
+ * @param {HTMLCanvasElement} target - Destination canvas element
  * @param {object} scene
- * @param {CanvasImageSource & {width:number,height:number}} scene.photo  adjusted photo
- * @param {CanvasImageSource | null} scene.mask   subject alpha, same size as photo (or null)
- * @param {object} scene.background             { mode, color, assetId, blur }
- * @param {object[]} scene.layers
- * @param {Map} scene.assets                    assetId → { bitmap }
+ * @param {CanvasImageSource & { width: number, height: number }} scene.photo
+ * @param {CanvasImageSource | null} scene.mask
+ * @param {{ mode: string, color?: string, assetId?: string, blur?: number }} scene.background
+ * @param {Array<object>} scene.layers
+ * @param {Map<string, { bitmap: CanvasImageSource }>} scene.assets
+ * @returns {HTMLCanvasElement}
  */
 export function compose(target, { photo, mask, background, layers, assets }) {
   const W = photo.width;
@@ -78,9 +94,7 @@ export function compose(target, { photo, mask, background, layers, assets }) {
     } else if (background.mode === 'blur') {
       drawBlurred(ctx, photo, W, H, background.blur);
     }
-    // 'transparent' leaves the backdrop empty.
 
-    // compose() is synchronous, so preview and export can share one scratch canvas.
     const subject = scratchCanvas('subject', W, H);
     const sctx = subject.getContext('2d');
     sctx.globalCompositeOperation = 'source-over';
@@ -96,8 +110,18 @@ export function compose(target, { photo, mask, background, layers, assets }) {
   return target;
 }
 
-/** True when the edit needs the compositing stage at all (keeps the fast path for plain photo edits). */
+/**
+ * Checks whether the document contains any layers or non-default background.
+ *
+ * @param {object} doc
+ * @returns {boolean}
+ */
 export const hasComposition = (doc) => doc.layers.length > 0 || needsMask(doc.background);
 
-/** Transparent output can only be kept in formats with alpha. */
+/**
+ * Checks whether the document background requires alpha channel preservation.
+ *
+ * @param {object} doc
+ * @returns {boolean}
+ */
 export const needsAlpha = (doc) => doc.background.mode === 'transparent';

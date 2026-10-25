@@ -1,18 +1,16 @@
 /**
- * Subject segmentation ("remove background").
- *
- * This is the only file that knows which model is used. It returns a canvas the size of the
- * original photo whose alpha channel is the subject, which `compose()` uses with
- * `destination-in`. Swap the implementation here to change providers (e.g. a server API).
- *
- * Current provider: @imgly/background-removal (ISNet via ONNX Runtime Web), running locally.
- * The model (~40–80 MB) is fetched from img.ly's CDN on first use and cached by the browser.
- * Licence: AGPL-3.0. Commercial distribution needs img.ly's commercial licence or another provider.
+ * Subject segmentation (background cutout) pipeline.
+ * Runs in-browser using ISNet FP16 via @imgly/background-removal (ONNX Runtime Web).
  */
 
-/** Model input is ~1024 px internally; larger inputs only cost time. */
 const INPUT_MAX = 2048;
 
+/**
+ * Rescales bitmap if larger than maximum model input threshold.
+ *
+ * @param {ImageBitmap} bitmap
+ * @returns {HTMLCanvasElement}
+ */
 function toInputCanvas(bitmap) {
   const scale = Math.min(1, INPUT_MAX / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
@@ -23,12 +21,13 @@ function toInputCanvas(bitmap) {
 }
 
 /**
- * @param {ImageBitmap} bitmap original photo (EXIF-oriented)
+ * Generates a full-resolution alpha mask separating the foreground subject from the background.
+ *
+ * @param {ImageBitmap} bitmap - Source image
  * @param {(fraction: number, phase: 'download' | 'inference') => void} [onProgress]
- * @returns {Promise<HTMLCanvasElement>} mask at the photo's full size
+ * @returns {Promise<HTMLCanvasElement>} Full-size alpha mask canvas
  */
 export async function segmentSubject(bitmap, onProgress) {
-  // Lazy-loaded: the library and ONNX runtime stay out of the main bundle until needed.
   const { removeBackground } = await import('@imgly/background-removal');
 
   const input = await new Promise((resolve) => toInputCanvas(bitmap).toBlob(resolve, 'image/png'));

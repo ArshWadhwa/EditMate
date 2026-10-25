@@ -57,12 +57,7 @@ function Editor() {
   const chooseFile = useCallback(() => fileInput.current?.click(), []);
   const savePreset = useCallback((draft = {}) => setPresetDraft(draft), []);
 
-  const run = (fn) => {
-    fn();
-    return true;
-  };
-
-  // Global shortcuts
+  // Global keyboard shortcuts
   useHotkeys('mod+o', (e) => { e.preventDefault(); chooseFile(); });
   useHotkeys('mod+z', (e) => { e.preventDefault(); if (image) editor.undo(); });
   useHotkeys('mod+shift+z, mod+y', (e) => { e.preventDefault(); if (image) editor.redo(); });

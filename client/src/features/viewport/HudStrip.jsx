@@ -22,7 +22,7 @@ export function HudStrip({ zoom, onZoom, displayScale }) {
   const [channels, setChannels] = useState(['l']);
 
   const size = outputSize(image.width, image.height, geometry);
-  // Exposure change relative to the unedited photo, measured identically in the worker.
+  // Relative exposure value (EV) delta computed from measured brightness.
   const ev = stats && sourceStats ? Math.log2(Math.max(stats.brightness, 1e-3) / Math.max(sourceStats.brightness, 1e-3)) : 0;
   const clip = clipping(histogram);
 

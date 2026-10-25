@@ -6,7 +6,7 @@ import { fitAdjustments, measure } from '../src/engine/analysis.js';
 import { autoStraightenCrop, outputSize } from '../src/engine/geometry.js';
 import { emptyDocument, useDocStore } from '../src/state/docStore.js';
 
-/** A small synthetic "photo": a warm-ish gradient with a darker band, so every stat has signal. */
+/** Generates a synthetic RGBA gradient buffer with distinct color bands for pipeline testing. */
 function syntheticImage(width = 96, height = 64) {
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y++) {

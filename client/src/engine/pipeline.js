@@ -1,14 +1,29 @@
 /**
- * Non-destructive pixel pipeline. Pure functions over RGBA buffers so the same code
- * runs in the preview worker, the export worker and the recipe fitter.
+ * Non-destructive pixel pipeline for color grading and adjustments.
+ * Pure functions operating over raw Uint8ClampedArray RGBA buffers.
  *
- * Order: white balance -> tone curve (both folded into per-channel LUTs)
- *        -> saturation/vibrance -> vignette -> grain.
+ * Pipeline sequence:
+ *   1. Per-channel tone curve & white balance LUTs
+ *   2. Saturation & vibrance chroma scaling
+ *   3. Vignette radial falloff
+ *   4. Luminance-weighted noise (film grain)
  */
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** Tone curve for a normalized value. Every term keeps 0 and 1 anchored except fade. */
+/**
+ * Computes non-linear tone response for a normalized input value in [0, 1].
+ * Preserves anchor points [0, 1] across contrast, highlights, and shadows.
+ *
+ * @param {number} v - Normalized input value [0, 1]
+ * @param {object} adjustments
+ * @param {number} [adjustments.brightness]
+ * @param {number} [adjustments.contrast]
+ * @param {number} [adjustments.highlights]
+ * @param {number} [adjustments.shadows]
+ * @param {number} [adjustments.fade]
+ * @returns {number} Mapped value clamped to [0, 1]
+ */
 export function toneCurve(v, { brightness, contrast, highlights, shadows, fade }) {
   if (brightness) v = Math.pow(v, Math.pow(2, -brightness * 0.009));
 
@@ -17,28 +32,39 @@ export function toneCurve(v, { brightness, contrast, highlights, shadows, fade }
     v = v < 0.5 ? 0.5 * Math.pow(2 * v, k) : 1 - 0.5 * Math.pow(2 * (1 - v), k);
   }
 
-  // Bell-shaped weights centred on the lower and upper thirds of the range.
   if (shadows) v = clamp01(v + shadows * 0.0035 * 4 * v * (1 - v) * (1 - v));
   if (highlights) v = clamp01(v + highlights * 0.0035 * 4 * v * v * (1 - v));
-
   if (fade) v = fade * 0.0022 + v * (1 - fade * 0.0022);
 
   return clamp01(v);
 }
 
-/** Builds the three per-channel lookup tables that combine white balance and tone. */
+/**
+ * Generates 256-element lookup tables (LUTs) combining white balance and tone curve
+ * for red, green, and blue channels.
+ *
+ * @param {object} adj - Normalized adjustment parameters
+ * @returns {[Uint8ClampedArray, Uint8ClampedArray, Uint8ClampedArray]}
+ */
 export function buildChannelLuts(adj) {
-  // Warmth trades red against blue; tint moves green only (positive = magenta).
   const gains = [1 + adj.warmth * 0.003, 1 - adj.tint * 0.0015, 1 - adj.warmth * 0.003];
 
   return gains.map((gain) => {
     const lut = new Uint8ClampedArray(256);
-    for (let i = 0; i < 256; i++) lut[i] = Math.round(toneCurve(clamp01((i / 255) * gain), adj) * 255);
+    for (let i = 0; i < 256; i++) {
+      lut[i] = Math.round(toneCurve(clamp01((i / 255) * gain), adj) * 255);
+    }
     return lut;
   });
 }
 
-/** Deterministic triangular noise in [-1, 1]; stable across renders so grain never shimmers. */
+/**
+ * Deterministic pseudo-random noise generator in [-1, 1].
+ *
+ * @param {number} x
+ * @param {number} y
+ * @returns {number}
+ */
 function noise(x, y) {
   let h = Math.imul(x, 374761393) + Math.imul(y, 668265263);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -51,11 +77,23 @@ function smoothstep(edge0, edge1, x) {
   return t * t * (3 - 2 * t);
 }
 
-/** Grain cells grow with resolution so a full-size export looks like the preview. */
+/**
+ * Computes grain cell size scaled proportionally to image resolution.
+ *
+ * @param {number} width - Image width in pixels
+ * @returns {number}
+ */
 export const grainCellSize = (width) => Math.max(1, Math.round(width / 1600));
 
 /**
- * Writes `src` with `adj` applied into `dst`. Both are RGBA buffers of width * height * 4.
+ * Applies color and tone adjustments from `src` into `dst`.
+ *
+ * @param {Uint8ClampedArray} src - Source RGBA buffer (width * height * 4)
+ * @param {Uint8ClampedArray} dst - Destination RGBA buffer
+ * @param {number} width
+ * @param {number} height
+ * @param {object} adj - Adjustment values
+ * @returns {Uint8ClampedArray}
  */
 export function applyAdjustments(src, dst, width, height, adj) {
   const [lutR, lutG, lutB] = buildChannelLuts(adj);
@@ -126,7 +164,13 @@ export function applyAdjustments(src, dst, width, height, adj) {
   return dst;
 }
 
-/** 256-bin histograms per channel plus luminance, sampled on every `step`-th pixel. */
+/**
+ * Computes 256-bin histograms for R, G, B channels and perceptual luminance.
+ *
+ * @param {Uint8ClampedArray} data - RGBA buffer
+ * @param {number} [step=2] - Subsampling step
+ * @returns {{ r: Uint32Array, g: Uint32Array, b: Uint32Array, l: Uint32Array }}
+ */
 export function computeHistogram(data, step = 2) {
   const r = new Uint32Array(256);
   const g = new Uint32Array(256);

@@ -4,8 +4,12 @@ import { applyAdjustments, computeHistogram } from './pipeline.js';
 import { measure } from './analysis.js';
 
 /**
- * Renders adjusted frames of `base` into an offscreen `output` canvas directly.
- * Runs in ~2ms on preview resolution with zero worker overhead or serialization lag.
+ * React hook that renders adjustment previews and calculates frame statistics
+ * directly to an offscreen canvas.
+ *
+ * @param {HTMLCanvasElement|null} base - Geometrically transformed base image
+ * @param {object} adjustments - Current adjustment slider values
+ * @returns {{ frame: { histogram: object|null, stats: object|null, sourceStats: object|null, id: number }, output: HTMLCanvasElement }}
  */
 export function usePreviewRenderer(base, adjustments) {
   const [frame, setFrame] = useState({ histogram: null, stats: null, sourceStats: null, id: 0 });

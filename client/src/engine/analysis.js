@@ -4,15 +4,21 @@ import { applyAdjustments } from './pipeline.js';
 import { readPixels } from './geometry.js';
 
 /**
- * Measured properties describe what is in an image. They are never used as slider
- * values directly: `fitAdjustments` searches for the slider values that move *your*
- * photo's measurements towards a target, which is what makes a recipe transferable.
+ * Image analysis, statistical measurement, and recipe-matching optimizer.
  */
 
 const LUM_R = 0.2126;
 const LUM_G = 0.7152;
 const LUM_B = 0.0722;
 
+/**
+ * Computes the p-th percentile from a cumulative luminance histogram.
+ *
+ * @param {Uint32Array} histogram
+ * @param {number} total - Total sample count
+ * @param {number} p - Percentile in [0, 1]
+ * @returns {number} Normalized luminance value in [0, 1]
+ */
 function percentile(histogram, total, p) {
   const target = total * p;
   let acc = 0;
@@ -24,8 +30,14 @@ function percentile(histogram, total, p) {
 }
 
 /**
- * @param {Uint8ClampedArray} data RGBA pixels
- * @param {{ sampleTarget?: number }} options roughly how many pixels to sample
+ * Extracts perceptual and tonal statistics from an RGBA pixel buffer.
+ *
+ * @param {Uint8ClampedArray} data - RGBA pixel array
+ * @param {number} width - Image width in pixels
+ * @param {number} height - Image height in pixels
+ * @param {object} [options]
+ * @param {number} [options.sampleTarget=Infinity] - Approximate target pixel sample budget
+ * @returns {{ brightness: number, contrast: number, saturation: number, warmth: number, tint: number, shadows: number, highlights: number, blackPoint: number, falloff: number }}
  */
 export function measure(data, width, height, { sampleTarget = Infinity } = {}) {
   const pixels = width * height;
@@ -95,7 +107,14 @@ export function measure(data, width, height, { sampleTarget = Infinity } = {}) {
   };
 }
 
-/** Median absolute Laplacian of luminance: a texture/noise estimate that ignores most edges. */
+/**
+ * Estimates high-frequency texture noise using the median absolute Laplacian of luminance.
+ *
+ * @param {Uint8ClampedArray} data
+ * @param {number} width
+ * @param {number} height
+ * @returns {number} Estimated noise level in [0, 255]
+ */
 export function measureNoise(data, width, height) {
   const lum = new Float32Array(width * height);
   for (let p = 0, i = 0; p < lum.length; p++, i += 4) {
@@ -116,8 +135,7 @@ export function measureNoise(data, width, height) {
 }
 
 /**
- * Each fitted dimension pairs a measured property with the slider that most directly
- * controls it. `scale` is a "noticeable difference" used to weight residuals.
+ * Mapping between measurable tonal statistics and their corresponding adjustment parameters.
  */
 export const FIT_DIMENSIONS = [
   { stat: 'brightness', key: 'brightness', scale: 0.05 },
@@ -135,7 +153,13 @@ const RANGE = Object.fromEntries(ADJUSTMENTS.map((a) => [a.key, a]));
 const LAMBDA = 0.08;
 const MU = 2e-4;
 
-/** Solves the small dense system A x = b with partial pivoting. */
+/**
+ * Solves a linear system Ax = b using Gaussian elimination with partial pivoting.
+ *
+ * @param {number[][]} A
+ * @param {number[]} b
+ * @returns {number[]} Solution vector x
+ */
 function solve(A, b) {
   const n = b.length;
   const M = A.map((row, i) => [...row, b[i]]);
@@ -159,14 +183,16 @@ function solve(A, b) {
 }
 
 /**
- * Finds slider values that bring `source` (a small RGBA thumbnail) closest to `target`
- * measurements, using damped Gauss-Newton with a numerically estimated Jacobian.
+ * Optimizes adjustment values to match source image statistics to a target reference profile
+ * using damped Gauss-Newton optimization with finite-difference Jacobian estimation.
  *
  * @param {object} params
  * @param {{ data: Uint8ClampedArray, width: number, height: number }} params.source
- * @param {Record<string, number>} params.target measurements to match (subset of `measure` output)
- * @param {object} [params.base] adjustments held fixed for keys not being fitted
- * @param {string[]} [params.keys] adjustment keys allowed to move
+ * @param {Record<string, number>} params.target
+ * @param {object} [params.base]
+ * @param {string[]} [params.keys]
+ * @param {number} [params.iterations=8]
+ * @returns {{ adjustments: object, matchBefore: number, matchAfter: number }}
  */
 export function fitAdjustments({ source, target, base = defaultAdjustments(), keys, iterations = 8 }) {
   const dims = FIT_DIMENSIONS.filter((d) => target[d.stat] !== undefined && (!keys || keys.includes(d.key)));
@@ -193,7 +219,6 @@ export function fitAdjustments({ source, target, base = defaultAdjustments(), ke
   const delta = 6;
 
   for (let iter = 0; iter < iterations; iter++) {
-    // J[i][j] = d residual_i / d x_j (in slider units)
     const J = dims.map(() => new Array(free.length).fill(0));
     free.forEach((key, j) => {
       const step = x[j] + delta > RANGE[key].max ? -delta : delta;
@@ -203,10 +228,6 @@ export function fitAdjustments({ source, target, base = defaultAdjustments(), ke
       for (let i = 0; i < dims.length; i++) J[i][j] = (r[i] - residual[i]) / step;
     });
 
-    // Levenberg-Marquardt step with a small pull towards neutral (prefer gentler edits):
-    //   (JᵀJ + λ·diag(JᵀJ) + μI) Δ = -Jᵀr - μx
-    // Sliders already at a bound and being pushed outwards are frozen and the step re-solved,
-    // so an unreachable target can't drag every other slider to an extreme.
     const n = free.length;
     const solveStep = (frozen) => {
       const A = Array.from({ length: n }, () => new Array(n).fill(0));
@@ -262,14 +283,25 @@ function rms(values) {
   return values.length ? Math.sqrt(values.reduce((s, v) => s + v * v, 0) / values.length) : 0;
 }
 
-/** Maps a weighted RMS residual to a friendly 0–100 similarity. */
 const matchScore = (error) => Math.round(100 * Math.exp(-error / 3));
 
-/** Grain isn't fitted (it barely moves global statistics); estimate it from texture difference. */
+/**
+ * Estimates recommended film grain adjustment based on relative texture differences.
+ *
+ * @param {number} referenceNoise
+ * @param {number} photoNoise
+ * @returns {number}
+ */
 export function suggestGrain(referenceNoise, photoNoise) {
   return clampAdjustment('grain', Math.max(0, (referenceNoise - photoNoise) * 2));
 }
 
+/**
+ * Classifies the visual color style of an image based on measured metrics.
+ *
+ * @param {object} m - Measured image statistics
+ * @returns {string} Style label
+ */
 export function classifyStyle(m) {
   if (m.saturation < 0.05) return m.contrast > 0.22 ? 'Noir' : 'Monochrome';
   if (m.blackPoint > 0.07 && m.contrast < 0.2) return 'Faded film';
@@ -281,7 +313,13 @@ export function classifyStyle(m) {
   return 'Clean editorial';
 }
 
-/** Dominant colours via coarse 4-bit-per-channel buckets, skipping near-duplicates. */
+/**
+ * Extracts dominant palette colors using uniform 4-bit quantization and Euclidean distance filtering.
+ *
+ * @param {Uint8ClampedArray} data - RGBA pixel buffer
+ * @param {number} [count=5] - Number of palette colors to extract
+ * @returns {string[]} Hex color codes
+ */
 export function extractPalette(data, count = 5) {
   const buckets = new Map();
   for (let i = 0; i < data.length; i += 16) {
@@ -315,7 +353,11 @@ const TONE_KEYS = ['brightness', 'contrast', 'highlights', 'shadows'];
 const clampVal = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /**
- * Auto tone: nudges exposure into a comfortable range and spreads the histogram.
+ * Computes optimal exposure and contrast adjustments for an image.
+ *
+ * @param {HTMLCanvasElement} thumbnail
+ * @param {object} current - Current adjustments
+ * @returns {object} Fitted adjustments
  */
 export function autoTone(thumbnail, current) {
   const source = readPixels(thumbnail);
@@ -330,7 +372,13 @@ export function autoTone(thumbnail, current) {
   return fitAdjustments({ source, target, base, keys: TONE_KEYS }).adjustments;
 }
 
-/** Gray-world white balance: removes the average colour cast. */
+/**
+ * Computes white balance adjustments to neutralize average color cast (Gray-world assumption).
+ *
+ * @param {HTMLCanvasElement} thumbnail
+ * @param {object} current
+ * @returns {object}
+ */
 export function autoWhiteBalance(thumbnail, current) {
   const source = readPixels(thumbnail);
   const base = { ...current, warmth: 0, tint: 0 };

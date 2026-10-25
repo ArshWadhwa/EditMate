@@ -15,7 +15,7 @@ FabricObject.ownDefaults.lockScalingFlip = true;
 
 /**
  * Interactive layer overlay powered by Fabric.js.
- * Provides bounding boxes, rotation knob, and scaling handles for layers without custom math.
+ * Provides transform handles, rotation controls, and bounding box selection for canvas layers.
  */
 export function LayerOverlay({ zoom }) {
   const { base, setUi } = useEditor();

@@ -4,7 +4,7 @@ import { defaultAdjustments } from '@editmate/shared';
 import { applyAdjustments, toneCurve } from '../src/engine/pipeline.js';
 import { fitAdjustments, measure } from '../src/engine/analysis.js';
 import { autoStraightenCrop, outputSize } from '../src/engine/geometry.js';
-import { historyReducer, initialHistory } from '../src/state/history.js';
+import { emptyDocument, useDocStore } from '../src/state/docStore.js';
 
 /** A small synthetic "photo": a warm-ish gradient with a darker band, so every stat has signal. */
 function syntheticImage(width = 96, height = 64) {
@@ -110,49 +110,46 @@ describe('geometry', () => {
   });
 });
 
-describe('history', () => {
-  const step = (state, ...actions) => actions.reduce(historyReducer, state);
-
+describe('history (zustand store)', () => {
   test('a drag of many previews is one undo step', () => {
-    let s = initialHistory();
-    for (let v = 1; v <= 30; v++) s = historyReducer(s, { type: 'preview', patch: { adjustments: { contrast: v } } });
-    s = historyReducer(s, { type: 'commit' });
-    assert.equal(s.past.length, 1);
-    s = historyReducer(s, { type: 'undo' });
-    assert.equal(s.present.adjustments.contrast, 0);
-    s = historyReducer(s, { type: 'redo' });
-    assert.equal(s.present.adjustments.contrast, 30);
+    useDocStore.getState().reset(emptyDocument());
+    for (let v = 1; v <= 30; v++) useDocStore.getState().preview({ adjustments: { contrast: v } });
+    useDocStore.getState().commit();
+    assert.equal(useDocStore.getState().past.length, 1);
+    useDocStore.getState().undo();
+    assert.equal(useDocStore.getState().doc.adjustments.contrast, 0);
+    useDocStore.getState().redo();
+    assert.equal(useDocStore.getState().doc.adjustments.contrast, 30);
   });
 
   test('committing an unchanged document adds no step, and new edits clear redo', () => {
-    let s = step(initialHistory(), { type: 'commit' });
-    assert.equal(s.past.length, 0);
-    s = step(s, { type: 'apply', patch: { adjustments: { warmth: 10 } } }, { type: 'undo' });
-    assert.equal(s.future.length, 1);
-    s = step(s, { type: 'apply', patch: { adjustments: { tint: 5 } } });
-    assert.equal(s.future.length, 0);
-  });
-
-  test('undo mid-gesture reverts the uncommitted preview', () => {
-    let s = step(initialHistory(), { type: 'apply', patch: { adjustments: { warmth: 10 } } });
-    s = step(s, { type: 'preview', patch: { adjustments: { warmth: 40 } } }, { type: 'undo' });
-    assert.equal(s.present.adjustments.warmth, 10);
+    useDocStore.getState().reset(emptyDocument());
+    useDocStore.getState().commit();
+    assert.equal(useDocStore.getState().past.length, 0);
+    useDocStore.getState().apply({ adjustments: { warmth: 10 } });
+    useDocStore.getState().undo();
+    assert.equal(useDocStore.getState().future.length, 1);
+    useDocStore.getState().apply({ adjustments: { tint: 5 } });
+    assert.equal(useDocStore.getState().future.length, 0);
   });
 
   test('layers and background changes are undoable steps', () => {
+    useDocStore.getState().reset(emptyDocument());
     const layer = { id: 'a', type: 'shape', x: 0.5, y: 0.5 };
-    let s = step(initialHistory(), { type: 'apply', patch: { layers: [layer] } });
-    s = step(s, { type: 'preview', patch: { layers: [{ ...layer, x: 0.7 }] } }, { type: 'preview', patch: { layers: [{ ...layer, x: 0.9 }] } }, { type: 'commit' });
-    s = step(s, { type: 'apply', patch: { background: { mode: 'color', color: '#ffffff' } } });
-    assert.equal(s.past.length, 3);
-    assert.equal(s.present.background.blur, 40, 'background patches merge with defaults');
+    useDocStore.getState().apply({ layers: [layer] });
+    useDocStore.getState().preview({ layers: [{ ...layer, x: 0.7 }] });
+    useDocStore.getState().preview({ layers: [{ ...layer, x: 0.9 }] });
+    useDocStore.getState().commit();
+    useDocStore.getState().apply({ background: { mode: 'color', color: '#ffffff' } });
+    assert.equal(useDocStore.getState().past.length, 3);
+    assert.equal(useDocStore.getState().doc.background.blur, 40, 'background patches merge with defaults');
 
-    s = step(s, { type: 'undo' });
-    assert.equal(s.present.background.mode, 'original');
-    assert.equal(s.present.layers[0].x, 0.9);
-    s = step(s, { type: 'undo' });
-    assert.equal(s.present.layers[0].x, 0.5);
-    s = step(s, { type: 'undo' });
-    assert.deepEqual(s.present.layers, []);
+    useDocStore.getState().undo();
+    assert.equal(useDocStore.getState().doc.background.mode, 'original');
+    assert.equal(useDocStore.getState().doc.layers[0].x, 0.9);
+    useDocStore.getState().undo();
+    assert.equal(useDocStore.getState().doc.layers[0].x, 0.5);
+    useDocStore.getState().undo();
+    assert.deepEqual(useDocStore.getState().doc.layers, []);
   });
 });

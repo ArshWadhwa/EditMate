@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { BookmarkPlus, Pipette, RotateCcw } from 'lucide-react';
 import { ADJUSTMENTS, ADJUSTMENT_GROUPS } from '@editmate/shared';
 import { useEditor } from '../../state/EditorProvider.jsx';
-import { autoTone, autoWhiteBalance } from '../../engine/auto.js';
+import { autoTone, autoWhiteBalance } from '../../engine/analysis.js';
 import { formatLabel } from '../../lib/image.js';
 import { formatBytes } from '../../lib/format.js';
 import { Panel, RoundButton, Segmented } from '../../components/ui.jsx';

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Columns2, Grid3x3 } from 'lucide-react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useEditor, useFrame } from '../../state/EditorProvider.jsx';
 import { outputSize } from '../../engine/geometry.js';
 import { compose } from '../../engine/composite.js';
@@ -50,38 +51,28 @@ function EditStage() {
   const beforeRef = useRef(null);
   const afterRef = useRef(null);
   const stageRef = useRef(null);
+  const transformRef = useRef(null);
   const stage = useElementSize(stageRef);
 
   const [zoom, setZoomState] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const drag = useRef(null);
 
   // Fit the frame inside the stage, leaving room for the HUD strip on wider screens.
   const ratio = base ? base.width / base.height : 1;
-  const fitWidth = Math.min(stage.width, stage.height * ratio);
+  const fitWidth = Math.min(stage.width || 800, (stage.height || 600) * ratio);
   const frame = { width: fitWidth, height: fitWidth / ratio };
   const natural = outputSize(image.width, image.height, geometry);
   const displayScale = (frame.width * zoom) / natural.width;
 
-  const clampPan = (p, z) => ({
-    x: clamp(p.x, -((z - 1) * frame.width) / 2, ((z - 1) * frame.width) / 2),
-    y: clamp(p.y, -((z - 1) * frame.height) / 2, ((z - 1) * frame.height) / 2),
-  });
-
-  /** Zooms keeping the point under `focus` (relative to the stage centre) fixed. */
-  const setZoom = (next, focus = { x: 0, y: 0 }) => {
+  const setZoom = (next) => {
     const z = clamp(next, MIN_ZOOM, MAX_ZOOM);
-    setPan((p) => {
-      const local = { x: (focus.x - p.x) / zoom, y: (focus.y - p.y) / zoom };
-      return clampPan({ x: focus.x - local.x * z, y: focus.y - local.y * z }, z);
-    });
+    transformRef.current?.setTransform(0, 0, z);
     setZoomState(z);
   };
 
   // Reset view when the image or crop changes.
   useEffect(() => {
+    transformRef.current?.resetTransform();
     setZoomState(1);
-    setPan({ x: 0, y: 0 });
   }, [base]);
 
   useEffect(() => {
@@ -92,7 +83,7 @@ function EditStage() {
     canvas.getContext('2d').drawImage(base, 0, 0);
   }, [base]);
 
-  // Re-paint once web fonts used by text layers have loaded (first paint may use a fallback).
+  // Re-paint once web fonts used by text layers have loaded.
   const [fontsReady, setFontsReady] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -102,72 +93,14 @@ function EditStage() {
     };
   }, [layers]);
 
-  // Adjusted photo → background replacement → layers. Cheap enough to redo on every drag.
+  // Adjusted photo → background replacement → layers.
   useEffect(() => {
     if (!afterRef.current || !output.width) return;
     compose(afterRef.current, { photo: output, mask: maskBase, background, layers, assets: assets.map });
   }, [output, frameId, maskBase, background, layers, assets.map, assets.version, fontsReady]);
 
-  // Non-passive wheel listener so we can prevent page scroll while zooming.
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const onWheel = (e) => {
-      e.preventDefault();
-      const rect = el.getBoundingClientRect();
-      const focus = { x: e.clientX - rect.left - rect.width / 2, y: e.clientY - rect.top - rect.height / 2 };
-      setZoom(zoom * Math.exp(-e.deltaY * 0.0022), focus);
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  });
-
-  // Touch: two fingers pinch-zoom around their midpoint; one finger pans once zoomed in.
-  // Pointers are tracked in the capture phase so a pinch still works over a selected layer.
-  const pointers = useRef(new Map());
-  const pinch = useRef(null);
-
-  const fromStageCentre = (x, y) => {
-    const rect = stageRef.current.getBoundingClientRect();
-    return { x: x - rect.left - rect.width / 2, y: y - rect.top - rect.height / 2 };
-  };
-  const pinchState = () => {
-    const [a, b] = [...pointers.current.values()];
-    return { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: fromStageCentre((a.x + b.x) / 2, (a.y + b.y) / 2) };
-  };
-
-  const onPointerDownCapture = (e) => {
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.current.size === 2) {
-      pinch.current = { ...pinchState(), zoom };
-      drag.current = null;
-    }
-  };
-  const onPointerDown = (e) => {
-    if (pinch.current || zoom === 1 || e.button !== 0) return;
-    drag.current = { x: e.clientX, y: e.clientY, pan };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e) => {
-    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pinch.current && pointers.current.size >= 2) {
-      const { dist, mid } = pinchState();
-      setZoom((pinch.current.zoom * dist) / Math.max(1, pinch.current.dist), mid);
-      return;
-    }
-    if (!drag.current) return;
-    const { x, y, pan: start } = drag.current;
-    setPan(clampPan({ x: start.x + e.clientX - x, y: start.y + e.clientY - y }, zoom));
-  };
-  const endDrag = (e) => {
-    pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinch.current = null;
-    drag.current = null;
-  };
-
   const showAfter = !ui.showOriginal;
   const afterClip = ui.compare ? `inset(0 0 0 ${ui.split * 100}%)` : 'none';
-  // The original sits underneath; hide it unless comparing so transparent areas stay transparent.
   const showBefore = ui.showOriginal || ui.compare;
   const beforeClip = ui.compare && showAfter ? `inset(0 ${(1 - ui.split) * 100}% 0 0)` : 'none';
   const transparent = background.mode === 'transparent' && maskBase;
@@ -176,42 +109,47 @@ function EditStage() {
     <>
       <img src={image.url} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover opacity-35 blur-3xl" />
 
-      <div className="absolute inset-0 p-3 sm:p-4 lg:left-[208px] lg:p-6">
-        <div
-          ref={stageRef}
-          className={cx('relative size-full touch-none overflow-hidden select-none [-webkit-touch-callout:none]', zoom > 1 && 'cursor-grab active:cursor-grabbing')}
-          onPointerDownCapture={onPointerDownCapture}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          onDoubleClick={() => setZoom(zoom > 1 ? 1 : 2)}
+      <div className="absolute inset-0 p-3 sm:p-4 lg:left-[208px] lg:p-6" ref={stageRef}>
+        <TransformWrapper
+          ref={transformRef}
+          initialScale={1}
+          minScale={MIN_ZOOM}
+          maxScale={MAX_ZOOM}
+          centerOnInit
+          doubleClick={{ mode: 'toggle', step: 1 }}
+          wheel={{ step: 0.1 }}
+          panning={{ excluded: ['fabric-overlay-container', 'canvas-container'] }}
+          onTransformed={(_ref, state) => setZoomState(state.scale)}
         >
-          <div
-            className={cx('absolute top-1/2 left-1/2 shadow-2xl shadow-black/60', transparent && 'bg-checker')}
-            style={{
-              width: frame.width,
-              height: frame.height,
-              transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            }}
+          <TransformComponent
+            wrapperClass="!w-full !h-full touch-none select-none overflow-hidden"
+            contentClass="!w-full !h-full flex items-center justify-center relative"
           >
-            <canvas
-              ref={beforeRef}
-              className={cx('absolute inset-0 size-full', !showBefore && 'invisible')}
-              style={{ clipPath: beforeClip }}
-              aria-label="Original photo"
-            />
-            <canvas
-              ref={afterRef}
-              className={cx('absolute inset-0 size-full', !showAfter && 'invisible')}
-              style={{ clipPath: afterClip }}
-              aria-label="Edited photo"
-            />
-            {ui.grid && <ThirdsGrid />}
-            {!ui.compare && showAfter && <LayerOverlay zoom={zoom} />}
-            {ui.compare && showAfter && <CompareDivider split={ui.split} zoom={zoom} onChange={(split) => setUi({ split })} />}
-          </div>
-        </div>
+            <div
+              className={cx('relative shadow-2xl shadow-black/60', transparent && 'bg-checker')}
+              style={{
+                width: frame.width,
+                height: frame.height,
+              }}
+            >
+              <canvas
+                ref={beforeRef}
+                className={cx('absolute inset-0 size-full', !showBefore && 'invisible')}
+                style={{ clipPath: beforeClip }}
+                aria-label="Original photo"
+              />
+              <canvas
+                ref={afterRef}
+                className={cx('absolute inset-0 size-full', !showAfter && 'invisible')}
+                style={{ clipPath: afterClip }}
+                aria-label="Edited photo"
+              />
+              {ui.grid && <ThirdsGrid />}
+              {!ui.compare && showAfter && <LayerOverlay zoom={zoom} />}
+              {ui.compare && showAfter && <CompareDivider split={ui.split} zoom={zoom} onChange={(split) => setUi({ split })} />}
+            </div>
+          </TransformComponent>
+        </TransformWrapper>
       </div>
 
       <HudStrip zoom={zoom} onZoom={(z) => setZoom(z)} displayScale={displayScale} />

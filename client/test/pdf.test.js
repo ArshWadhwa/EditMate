@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { jpegToPdf } from '../src/engine/pdf.js';
+import { jpegToPdf } from '../src/engine/exportImage.js';
 
 test('writes a valid single-page PDF around the JPEG bytes', async () => {
   const fakeJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9]);

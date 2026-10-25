@@ -34,65 +34,16 @@ function drawCover(ctx, image, W, H) {
   ctx.drawImage(image, (W - w) / 2, (H - h) / 2, w, h);
 }
 
-let filterSupport;
-/** Canvas `filter` is missing in some browsers (Safari); detect once by blurring a single pixel. */
-function supportsCanvasFilter() {
-  if (filterSupport !== undefined) return filterSupport;
-  try {
-    const c = document.createElement('canvas');
-    c.width = c.height = 9;
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.filter = 'blur(2px)';
-    ctx.fillRect(4, 4, 1, 1);
-    filterSupport = ctx.getImageData(2, 4, 1, 1).data[3] > 0;
-  } catch {
-    filterSupport = false;
-  }
-  return filterSupport;
-}
-
 /**
- * Blurs `image` over the whole canvas. The radius is a fraction of the image size, so the preview
- * and a full-resolution export look the same. Edges are overdrawn to avoid a dark fade-in.
+ * Blurs `image` over the whole canvas using native hardware-accelerated canvas filter.
+ * The radius is a fraction of the image size so preview and export look identical.
  */
 function drawBlurred(ctx, image, W, H, amount) {
   const radius = (amount / 100) * 0.04 * Math.max(W, H);
   const bleed = radius * 2;
-
-  if (supportsCanvasFilter()) {
-    ctx.save();
-    ctx.filter = `blur(${radius}px)`;
-    ctx.drawImage(image, -bleed, -bleed, W + bleed * 2, H + bleed * 2);
-    ctx.restore();
-    return;
-  }
-
-  // Fallback: halve repeatedly, then double back up. Each 2× step with smoothing acts as a small
-  // box filter, which together approximate a Gaussian far better than one big rescale.
-  let src = image;
-  let w = W;
-  let h = H;
-  for (let i = 0; w > 8 && h > 8 && 2 ** i < radius; i++) {
-    w = Math.max(1, Math.round(w / 2));
-    h = Math.max(1, Math.round(h / 2));
-    const step = scratchCanvas(`blur-${i}`, w, h);
-    const sctx = step.getContext('2d');
-    sctx.imageSmoothingQuality = 'high';
-    sctx.drawImage(src, 0, 0, w, h);
-    src = step;
-  }
-  for (let i = 0; w * 2 < W; i++) {
-    w *= 2;
-    h *= 2;
-    const step = scratchCanvas(`blur-up-${i}`, w, h);
-    const sctx = step.getContext('2d');
-    sctx.imageSmoothingQuality = 'high';
-    sctx.drawImage(src, 0, 0, w, h);
-    src = step;
-  }
   ctx.save();
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(src, -bleed, -bleed, W + bleed * 2, H + bleed * 2);
+  ctx.filter = `blur(${radius}px)`;
+  ctx.drawImage(image, -bleed, -bleed, W + bleed * 2, H + bleed * 2);
   ctx.restore();
 }
 

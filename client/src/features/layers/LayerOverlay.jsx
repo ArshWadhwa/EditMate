@@ -1,185 +1,204 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import { Canvas, Rect, FabricObject } from 'fabric';
 import { useEditor } from '../../state/EditorProvider.jsx';
-import { layerBox } from '../../engine/layers.js';
-import { CORNERS, SIDES, hitTest, resizeBox, rotationTowards } from '../../engine/layerMath.js';
-import { cx } from '../../components/ui.jsx';
-import { COARSE_POINTER_QUERY, useMediaQuery } from '../../lib/useMediaQuery.js';
+import { layoutText } from '../../engine/layers.js';
 import { useLayerActions } from './useLayerActions.js';
 
-/** Snap the centre to the canvas middle within this fraction of the output. */
-const SNAP = 0.012;
-const CURSORS = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', e: 'ew-resize', w: 'ew-resize' };
+// Configure default control styling for Fabric objects
+FabricObject.ownDefaults.borderColor = '#5ac8fa';
+FabricObject.ownDefaults.cornerColor = '#ffffff';
+FabricObject.ownDefaults.cornerStrokeColor = '#0284c7';
+FabricObject.ownDefaults.cornerSize = 10;
+FabricObject.ownDefaults.transparentCorners = false;
+FabricObject.ownDefaults.cornerStyle = 'rect';
+FabricObject.ownDefaults.lockScalingFlip = true;
 
 /**
- * Interactive layer editing on top of the photo. Lives inside the zoomed frame, so it works in
- * frame coordinates; handles are counter-scaled by 1/zoom to keep a constant on-screen size.
- * Clicks that miss every layer fall through to the stage (for panning).
+ * Interactive layer overlay powered by Fabric.js.
+ * Provides bounding boxes, rotation knob, and scaling handles for layers without custom math.
  */
 export function LayerOverlay({ zoom }) {
   const { base, setUi } = useEditor();
-  const { layers, selected, select, previewUpdate, commit } = useLayerActions();
-  const rootRef = useRef(null);
-  const drag = useRef(null);
-  const [guides, setGuides] = useState({ x: false, y: false });
-  const [hovering, setHovering] = useState(false);
-  // Fingers need bigger targets than a mouse: larger handles and a more forgiving hit area.
-  const touch = useMediaQuery(COARSE_POINTER_QUERY);
-  const hitSlop = touch ? 16 : 6;
-  const handleScale = touch ? 1.7 : 1;
+  const { layers, selected, select, previewUpdate, commit, update } = useLayerActions();
+  const canvasElRef = useRef(null);
+  const fabricRef = useRef(null);
+  const isInteractingRef = useRef(false);
+
+  const W = base?.width || 1;
+  const H = base?.height || 1;
+
+  // Initialize Fabric Canvas
+  useEffect(() => {
+    const el = canvasElRef.current;
+    if (!el || !base) return;
+
+    const canvas = new Canvas(el, {
+      width: W,
+      height: H,
+      selection: false,
+      preserveObjectStacking: true,
+    });
+    fabricRef.current = canvas;
+
+    // Selection events
+    canvas.on('selection:created', (e) => {
+      const target = e.selected?.[0];
+      if (target?.layerId) select(target.layerId);
+    });
+    canvas.on('selection:updated', (e) => {
+      const target = e.selected?.[0];
+      if (target?.layerId) select(target.layerId);
+    });
+    canvas.on('selection:cleared', () => {
+      select(null);
+    });
+
+    // Live gesture updates
+    canvas.on('object:moving', (e) => {
+      const obj = e.target;
+      if (!obj?.layerId) return;
+      isInteractingRef.current = true;
+      previewUpdate(obj.layerId, { x: obj.left / W, y: obj.top / H });
+    });
+
+    canvas.on('object:rotating', (e) => {
+      const obj = e.target;
+      if (!obj?.layerId) return;
+      isInteractingRef.current = true;
+      previewUpdate(obj.layerId, { rotation: Math.round(obj.angle % 360) });
+    });
+
+    // Gesture committed (move, rotate, scale end)
+    canvas.on('object:modified', (e) => {
+      const obj = e.target;
+      if (!obj?.layerId) return;
+
+      const scaleX = obj.scaleX || 1;
+      const scaleY = obj.scaleY || 1;
+      const patch = {
+        x: obj.left / W,
+        y: obj.top / H,
+        w: (obj.width * scaleX) / W,
+        rotation: Math.round(obj.angle % 360),
+      };
+
+      if (obj.layerType === 'text') {
+        const orig = layers.find((l) => l.id === obj.layerId);
+        if (orig) patch.size = orig.size * scaleY;
+      } else {
+        patch.h = (obj.height * scaleY) / H;
+      }
+
+      obj.width *= scaleX;
+      obj.height *= scaleY;
+      obj.scaleX = 1;
+      obj.scaleY = 1;
+
+      commit();
+      update(obj.layerId, patch);
+      setTimeout(() => {
+        isInteractingRef.current = false;
+      }, 50);
+    });
+
+    // Double-click text/shape to inspect layer options
+    canvas.on('mouse:dblclick', (e) => {
+      if (e.target?.layerId) {
+        select(e.target.layerId);
+        setUi({ tool: 'layers' });
+        if (e.target.layerType === 'text') {
+          requestAnimationFrame(() => document.getElementById('layer-text')?.select());
+        }
+      }
+    });
+
+    return () => {
+      canvas.dispose();
+      fabricRef.current = null;
+    };
+  }, [base, W, H]);
+
+  // Adjust corner size with zoom level
+  useEffect(() => {
+    if (fabricRef.current) {
+      fabricRef.current.calcOffset();
+      const cornerSize = Math.max(7, Math.round(11 / (zoom || 1)));
+      fabricRef.current.getObjects().forEach((o) => {
+        o.cornerSize = cornerSize;
+      });
+      fabricRef.current.requestRenderAll();
+    }
+  }, [zoom]);
+
+  // Populate Fabric objects from document layers
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas || !base) return;
+    if (isInteractingRef.current) return;
+
+    canvas.remove(...canvas.getObjects());
+
+    layers.forEach((layer) => {
+      if (layer.hidden) return;
+
+      let w = layer.w * W;
+      let h = layer.h * H;
+      if (layer.type === 'text') {
+        const layout = layoutText(layer, W, H);
+        h = layout.height;
+      }
+
+      const rect = new Rect({
+        left: layer.x * W,
+        top: layer.y * H,
+        width: Math.max(12, w),
+        height: Math.max(12, h),
+        originX: 'center',
+        originY: 'center',
+        angle: layer.rotation || 0,
+        fill: 'rgba(0, 0, 0, 0.001)', // captures pointer events while transparent
+        stroke: 'transparent',
+        hasControls: true,
+        hasBorders: true,
+        cornerSize: Math.max(7, Math.round(11 / (zoom || 1))),
+      });
+
+      rect.layerId = layer.id;
+      rect.layerType = layer.type;
+      canvas.add(rect);
+
+      if (selected && selected.id === layer.id) {
+        canvas.setActiveObject(rect);
+      }
+    });
+
+    canvas.requestRenderAll();
+  }, [layers, base, selected?.id, W, H, zoom]);
+
+  // Sync external selection (e.g. clicked in sidebar)
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (selected) {
+      if (active?.layerId !== selected.id) {
+        const match = canvas.getObjects().find((o) => o.layerId === selected.id);
+        if (match) {
+          canvas.setActiveObject(match);
+          canvas.requestRenderAll();
+        }
+      }
+    } else if (active) {
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+    }
+  }, [selected?.id]);
 
   if (!base) return null;
-  const W = base.width;
-  const H = base.height;
-  const boxes = layers.map((l) => (l.hidden ? null : layerBox(l, W, H)));
-
-  /** Pointer position in output pixels. */
-  const toOutput = (e) => {
-    const rect = rootRef.current.getBoundingClientRect();
-    return { x: ((e.clientX - rect.left) / rect.width) * W, y: ((e.clientY - rect.top) / rect.height) * H, scale: rect.width / W };
-  };
-
-  const begin = (e, mode, layer, box) => {
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { mode, layer, box, start: toOutput(e) };
-  };
-
-  const onRootPointerDown = (e) => {
-    if (e.button !== 0) return;
-    const p = toOutput(e);
-    const index = hitTest(boxes, p.x, p.y, hitSlop / p.scale);
-    if (index < 0) {
-      if (selected) select(null);
-      return; // let the stage pan
-    }
-    const layer = layers[index];
-    select(layer.id);
-    begin(e, 'move', layer, boxes[index]);
-  };
-
-  const onPointerMove = (e) => {
-    const d = drag.current;
-    if (!d) {
-      const p = toOutput(e);
-      setHovering(hitTest(boxes, p.x, p.y, hitSlop / p.scale) >= 0);
-      return;
-    }
-    const p = toOutput(e);
-    const dx = p.x - d.start.x;
-    const dy = p.y - d.start.y;
-    const { layer, box } = d;
-
-    if (d.mode === 'move') {
-      let x = layer.x + dx / W;
-      let y = layer.y + dy / H;
-      const snapX = Math.abs(x - 0.5) < SNAP;
-      const snapY = Math.abs(y - 0.5) < SNAP;
-      if (snapX) x = 0.5;
-      if (snapY) y = 0.5;
-      setGuides({ x: snapX, y: snapY });
-      previewUpdate(layer.id, { x, y });
-      return;
-    }
-
-    if (d.mode === 'rotate') {
-      previewUpdate(layer.id, { rotation: rotationTowards(box, p.x, p.y, { step: e.shiftKey }) });
-      return;
-    }
-
-    // Resize. Text scales uniformly from corners; side handles change its wrap width.
-    // Images keep their aspect unless Shift is held; shapes are free unless Shift is held.
-    const handle = d.mode;
-    const isCorner = handle in CORNERS;
-    const keepAspect = layer.type === 'text' ? isCorner : layer.type === 'image' ? !e.shiftKey : e.shiftKey && isCorner;
-    const { box: next, scale } = resizeBox(box, handle, dx, dy, { keepAspect, minSize: 12 / p.scale });
-    const patch = { x: next.cx / W, y: next.cy / H, w: next.w / W };
-    if (layer.type === 'text') {
-      if (isCorner) patch.size = layer.size * scale;
-    } else {
-      patch.h = next.h / H;
-    }
-    previewUpdate(layer.id, patch);
-  };
-
-  const onPointerUp = () => {
-    if (!drag.current) return;
-    drag.current = null;
-    setGuides({ x: false, y: false });
-    commit();
-  };
-
-  const onDoubleClick = (e) => {
-    const p = toOutput(e);
-    const index = hitTest(boxes, p.x, p.y, hitSlop / p.scale);
-    if (index < 0) return;
-    e.stopPropagation(); // don't zoom the stage
-    const layer = layers[index];
-    select(layer.id);
-    setUi({ tool: 'layers' });
-    if (layer.type === 'text') requestAnimationFrame(() => document.getElementById('layer-text')?.select());
-  };
-
-  const selectedIndex = selected ? layers.indexOf(selected) : -1;
-  const box = selectedIndex >= 0 ? boxes[selectedIndex] : null;
-  const inv = 1 / zoom;
-  const h = inv * handleScale;
-  const handles = selected ? [...Object.keys(CORNERS), ...(selected.type === 'image' ? [] : Object.keys(SIDES))] : [];
 
   return (
-    <div
-      ref={rootRef}
-      className={cx('absolute inset-0', hovering && 'cursor-move')}
-      onPointerDown={onRootPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onDoubleClick={onDoubleClick}
-    >
-      {guides.x && <span className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed border-rec" style={{ borderLeftWidth: inv }} />}
-      {guides.y && <span className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-rec" style={{ borderTopWidth: inv }} />}
-
-      {box && (
-        <div
-          className="pointer-events-none absolute"
-          style={{
-            left: `${(box.cx / W) * 100}%`,
-            top: `${(box.cy / H) * 100}%`,
-            width: `${(box.w / W) * 100}%`,
-            height: `${(box.h / H) * 100}%`,
-            transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
-            boxShadow: `0 0 0 ${inv}px var(--color-sky)`,
-          }}
-        >
-          {/* rotate knob */}
-          <span className="absolute bottom-full left-1/2 bg-sky" style={{ width: inv, height: 22 * h, transform: 'translateX(-50%)' }} />
-          <span
-            className="pointer-events-auto absolute left-1/2 cursor-grab rounded-full border-2 border-sky bg-white active:cursor-grabbing"
-            style={{ width: 14 * h, height: 14 * h, bottom: `calc(100% + ${22 * h}px)`, transform: 'translate(-50%, 50%)', borderWidth: 2 * inv }}
-            onPointerDown={(e) => begin(e, 'rotate', selected, box)}
-            title="Rotate (Shift snaps to 15°)"
-          />
-
-          {handles.map((handle) => {
-            const [sx, sy] = CORNERS[handle] ?? SIDES[handle];
-            return (
-              <span
-                key={handle}
-                onPointerDown={(e) => begin(e, handle, selected, box)}
-                className="pointer-events-auto absolute rounded-[3px] border-sky bg-white shadow"
-                style={{
-                  width: (handle in SIDES ? 8 : 12) * h,
-                  height: (handle in SIDES ? 20 : 12) * h,
-                  borderWidth: 1.5 * inv,
-                  left: `${50 + sx * 50}%`,
-                  top: `${50 + sy * 50}%`,
-                  transform: 'translate(-50%, -50%)',
-                  cursor: CURSORS[handle],
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
+    <div className="fabric-overlay-container absolute inset-0 size-full pointer-events-auto">
+      <canvas ref={canvasElRef} className="size-full" />
     </div>
   );
 }

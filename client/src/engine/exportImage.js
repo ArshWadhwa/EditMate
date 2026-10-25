@@ -1,8 +1,7 @@
-import { renderGeometry } from './geometry.js';
-import { processInWorker } from './usePreviewRenderer.js';
+import { renderGeometry, readPixels } from './geometry.js';
+import { applyAdjustments } from './pipeline.js';
 import { compose, hasComposition } from './composite.js';
 import { loadLayerFonts } from './layers.js';
-import { jpegToPdf } from './pdf.js';
 
 /**
  * Export formats. `mime` is what the canvas encodes; PDF wraps a JPEG.
@@ -48,8 +47,9 @@ export function defaultFormatFor(mimeType) {
  */
 export async function renderFull({ bitmap, doc, mask, assets }) {
   const photo = renderGeometry(bitmap, doc.geometry, Infinity);
-  const processed = await processInWorker(photo, doc.adjustments);
-  photo.getContext('2d').putImageData(processed, 0, 0);
+  const { data } = readPixels(photo);
+  applyAdjustments(data, data, photo.width, photo.height, doc.adjustments);
+  photo.getContext('2d').putImageData(new ImageData(data, photo.width, photo.height), 0, 0);
   if (!hasComposition(doc)) return photo;
 
   await loadLayerFonts(doc.layers);
@@ -108,4 +108,57 @@ export function downloadBlob(blob, filename) {
 export function exportFilename(originalName, format) {
   const base = originalName.replace(/\.[^.]+$/, '') || 'photo';
   return `${base}-editmate.${formatFor(format).extension}`;
+}
+
+/**
+ * Minimal single-page PDF writer: embeds one JPEG as-is (DCTDecode).
+ */
+export function jpegToPdf(jpegBytes, widthPx, heightPx, { dpi = 300, title = 'EditMate export' } = {}) {
+  const encoder = new TextEncoder();
+  const pageW = ((widthPx * 72) / dpi).toFixed(2);
+  const pageH = ((heightPx * 72) / dpi).toFixed(2);
+  const content = `q ${pageW} 0 0 ${pageH} 0 0 cm /Im0 Do Q`;
+  const escapedTitle = title.replace(/[\\()]/g, (c) => `\\${c}`);
+
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`,
+    null,
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    `<< /Title (${escapedTitle}) /Producer (EditMate) >>`,
+  ];
+
+  const chunks = [];
+  const offsets = [];
+  let length = 0;
+  const push = (part) => {
+    const bytes = typeof part === 'string' ? encoder.encode(part) : part;
+    chunks.push(bytes);
+    length += bytes.length;
+  };
+
+  push('%PDF-1.4\n%âãÏÓ\n');
+  objects.forEach((body, i) => {
+    offsets.push(length);
+    push(`${i + 1} 0 obj\n`);
+    if (body === null) {
+      push(
+        `<< /Type /XObject /Subtype /Image /Width ${widthPx} /Height ${heightPx} /ColorSpace /DeviceRGB ` +
+          `/BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`,
+      );
+      push(jpegBytes);
+      push('\nendstream');
+    } else {
+      push(body);
+    }
+    push('\nendobj\n');
+  });
+
+  const xrefStart = length;
+  push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
+  for (const offset of offsets) push(`${String(offset).padStart(10, '0')} 00000 n \n`);
+  push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R /Info ${objects.length} 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`);
+
+  return new Blob(chunks, { type: 'application/pdf' });
 }

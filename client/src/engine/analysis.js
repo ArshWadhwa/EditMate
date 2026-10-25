@@ -1,5 +1,7 @@
 import { ADJUSTMENTS, clampAdjustment, defaultAdjustments } from '@editmate/shared';
+import { colord } from 'colord';
 import { applyAdjustments } from './pipeline.js';
+import { readPixels } from './geometry.js';
 
 /**
  * Measured properties describe what is in an image. They are never used as slider
@@ -301,8 +303,36 @@ export function extractPalette(data, count = 5) {
 
   const picked = [];
   for (const c of colors) {
-    if (picked.every((p) => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]) > 48)) picked.push(c);
+    if (picked.every((p) => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]) > 48)) {
+      picked.push(colord({ r: c[0], g: c[1], b: c[2] }).toHex());
+    }
     if (picked.length === count) break;
   }
-  return picked.map((c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join(''));
+  return picked;
+}
+
+const TONE_KEYS = ['brightness', 'contrast', 'highlights', 'shadows'];
+const clampVal = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * Auto tone: nudges exposure into a comfortable range and spreads the histogram.
+ */
+export function autoTone(thumbnail, current) {
+  const source = readPixels(thumbnail);
+  const m = measure(source.data, source.width, source.height);
+  const target = {
+    brightness: clampVal(m.brightness, 0.4, 0.56),
+    contrast: clampVal(m.contrast, 0.19, 0.26),
+    highlights: Math.max(m.highlights, 0.9),
+    shadows: Math.min(m.shadows, 0.07),
+  };
+  const base = { ...current, ...Object.fromEntries(TONE_KEYS.map((k) => [k, 0])) };
+  return fitAdjustments({ source, target, base, keys: TONE_KEYS }).adjustments;
+}
+
+/** Gray-world white balance: removes the average colour cast. */
+export function autoWhiteBalance(thumbnail, current) {
+  const source = readPixels(thumbnail);
+  const base = { ...current, warmth: 0, tint: 0 };
+  return fitAdjustments({ source, target: { warmth: 0, tint: 0 }, base, keys: ['warmth', 'tint'] }).adjustments;
 }

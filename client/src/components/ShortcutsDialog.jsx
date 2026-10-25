@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { MOD_LABEL } from '../lib/useHotkeys.js';
+export const MOD_LABEL = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 import { Kbd } from './ui.jsx';
 
 const SHORTCUTS = [

@@ -1,4 +1,39 @@
 @import 'tailwindcss';
+@import 'cropperjs/dist/cropper.css';
+
+/* Cropper styling for EditMate dark theme */
+.cropper-view-box {
+  outline: 1.5px solid var(--color-sky) !important;
+}
+.cropper-line {
+  background-color: var(--color-sky) !important;
+  opacity: 0.6;
+}
+.cropper-point {
+  background-color: #ffffff !important;
+  border: 1px solid #000000 !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 2px !important;
+}
+.cropper-modal {
+  background-color: rgb(7 7 8 / 0.72) !important;
+}
+.cropper-bg {
+  background-image: none !important;
+}
+
+/* Fabric canvas overlay container */
+.fabric-overlay-container .canvas-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+.fabric-overlay-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
 
 @theme {
   --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;

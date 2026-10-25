@@ -1,20 +1,20 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { defaultAdjustments, isNeutral } from '@editmate/shared';
 import { defaultGeometry, downscale, renderGeometry } from '../engine/geometry.js';
 import { usePreviewRenderer } from '../engine/usePreviewRenderer.js';
 import { EXPORT_SIZES, defaultFormatFor, downloadBlob, encodeExport, exportFilename, formatFor, renderFull } from '../engine/exportImage.js';
 import { needsAlpha } from '../engine/composite.js';
 import { needsMask } from '../engine/layers.js';
-import { emptyDocument, historyReducer, initialHistory, sameDocument } from './history.js';
 import { useAssets } from './useAssets.js';
 import { useSubjectMask } from './useSubjectMask.js';
 import { useExportSettings } from './useExportSettings.js';
 import { loadImageFile, releaseImage } from '../lib/image.js';
 import { useToast } from '../components/Toaster.jsx';
+import { emptyDocument, useDocStore } from './docStore.js';
 
-/** Longest side of the interactive preview. Exports always use full resolution. */
+export { emptyDocument, useDocStore };
+
 export const PREVIEW_MAX = 1800;
-/** Longest side of the thumbnail used for recipe fitting and preset previews. */
 const THUMB_MAX = 200;
 
 const EditorContext = createContext(null);
@@ -23,7 +23,9 @@ const FrameContext = createContext(null);
 export function EditorProvider({ children }) {
   const toast = useToast();
   const [image, setImage] = useState(null);
-  const [history, dispatch] = useReducer(historyReducer, undefined, () => initialHistory());
+  const doc = useDocStore((s) => s.doc);
+  const { adjustments, geometry, background, layers } = doc;
+
   const [ui, setUi] = useState({
     tool: 'adjust',
     group: 'light',
@@ -33,7 +35,6 @@ export function EditorProvider({ children }) {
     grid: false,
     showOriginal: false,
     dock: 'inspire',
-    /** Mobile only: which sheet the Adjust tool shows (adjust | inspire | presets). */
     sheet: 'adjust',
     selectedLayerId: null,
   });
@@ -41,11 +42,9 @@ export function EditorProvider({ children }) {
   const [exportSettings, setExportSettings] = useExportSettings();
   const [exportedDoc, setExportedDoc] = useState(null);
 
-  const { adjustments, geometry, background, layers } = history.present;
   const assets = useAssets();
   const subject = useSubjectMask(image);
 
-  // Geometry only changes on discrete actions, so the base is cheap to recompute.
   const base = useMemo(
     () => (image ? renderGeometry(image.bitmap, geometry, PREVIEW_MAX) : null),
     [image, geometry],
@@ -54,7 +53,6 @@ export function EditorProvider({ children }) {
 
   const { frame, output } = usePreviewRenderer(base, adjustments);
 
-  // The subject mask goes through the same geometry as the photo, so they always line up.
   const maskBase = useMemo(
     () => (subject.mask ? renderGeometry(subject.mask, geometry, PREVIEW_MAX) : null),
     [subject.mask, geometry],
@@ -70,7 +68,7 @@ export function EditorProvider({ children }) {
         const loaded = await loadImageFile(file);
         releaseImage(imageRef.current);
         setImage(loaded);
-        dispatch({ type: 'load', doc: emptyDocument() });
+        useDocStore.getState().reset(emptyDocument());
         setExportedDoc(null);
         setUi((u) => ({ ...u, tool: 'adjust', compare: false, showOriginal: false, selectedLayerId: null }));
       } catch (err) {
@@ -82,26 +80,24 @@ export function EditorProvider({ children }) {
 
   const actions = useMemo(
     () => ({
-      preview: (patch) => dispatch({ type: 'preview', patch }),
-      commit: () => dispatch({ type: 'commit' }),
-      apply: (patch) => dispatch({ type: 'apply', patch }),
-      undo: () => dispatch({ type: 'undo' }),
-      redo: () => dispatch({ type: 'redo' }),
-      resetAdjustments: () => dispatch({ type: 'apply', patch: { adjustments: defaultAdjustments() } }),
-      resetGeometry: () => dispatch({ type: 'apply', patch: { geometry: defaultGeometry() } }),
+      preview: (patch) => useDocStore.getState().preview(patch),
+      commit: () => useDocStore.getState().commit(),
+      apply: (patch) => useDocStore.getState().apply(patch),
+      undo: () => useDocStore.getState().undo(),
+      redo: () => useDocStore.getState().redo(),
+      resetAdjustments: () => useDocStore.getState().apply({ adjustments: defaultAdjustments() }),
+      resetGeometry: () => useDocStore.getState().apply({ geometry: defaultGeometry() }),
       setUi: (patch) => setUi((u) => ({ ...u, ...(typeof patch === 'function' ? patch(u) : patch) })),
     }),
     [],
   );
 
-  /** Effective format: the chosen one, or the original's; transparent edits never default to JPEG. */
   const exportFormat =
-    exportSettings.format ?? (image && needsAlpha(history.present) ? 'png' : defaultFormatFor(image?.type));
+    exportSettings.format ?? (image && needsAlpha(doc) ? 'png' : defaultFormatFor(image?.type));
 
   const exportImage = useCallback(async () => {
     if (!image || exporting) return;
     setExporting(true);
-    const doc = history.present;
     try {
       const mask = needsMask(doc.background) ? subject.mask : null;
       const canvas = await renderFull({ bitmap: image.bitmap, doc, mask, assets: assets.map });
@@ -117,7 +113,7 @@ export function EditorProvider({ children }) {
     } finally {
       setExporting(false);
     }
-  }, [image, exporting, history.present, subject.mask, assets.map, exportSettings, exportFormat, toast]);
+  }, [image, exporting, doc, subject.mask, assets.map, exportSettings, exportFormat, toast]);
 
   const value = useMemo(
     () => ({
@@ -133,14 +129,12 @@ export function EditorProvider({ children }) {
       maskBase,
       subject,
       assets,
-      canUndo: history.past.length > 0 || !sameDocument(history.present, history.committed),
-      canRedo: history.future.length > 0,
-      editCount: history.past.length,
-      /** No edits of any kind (adjustments, background, layers). */
+      canUndo: useDocStore.getState().past.length > 0,
+      canRedo: useDocStore.getState().future.length > 0,
+      editCount: useDocStore.getState().past.length,
       isPristine: isNeutral(adjustments) && !layers.length && !needsMask(background),
-      /** Slider values untouched; presets and "reset adjustments" care only about these. */
       adjustmentsPristine: isNeutral(adjustments),
-      isExported: exportedDoc !== null && sameDocument(exportedDoc, history.present),
+      isExported: exportedDoc !== null && exportedDoc === doc,
       exporting,
       exportSettings,
       exportFormat,
@@ -149,7 +143,7 @@ export function EditorProvider({ children }) {
       exportImage,
       ...actions,
     }),
-    [image, base, thumbnail, adjustments, geometry, background, layers, ui, output, maskBase, subject, assets, history, exportedDoc, exporting, exportSettings, exportFormat, setExportSettings, openFile, exportImage, actions],
+    [image, base, thumbnail, adjustments, geometry, background, layers, ui, output, maskBase, subject, assets, exportedDoc, doc, exporting, exportSettings, exportFormat, setExportSettings, openFile, exportImage, actions],
   );
 
   return (
@@ -165,7 +159,6 @@ export function useEditor() {
   return ctx;
 }
 
-/** Live render output: { histogram, stats, sourceStats, id } of the current preview frame. */
 export function useFrame() {
   return useContext(FrameContext);
 }

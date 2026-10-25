@@ -12,10 +12,17 @@
   "dependencies": {
     "@editmate/shared": "1.0.0",
     "@imgly/background-removal": "^1.7.0",
+    "colord": "^2.10.0",
+    "cropperjs": "^1.7.0",
+    "fabric": "^6.9.1",
     "lucide-react": "^1.61.0",
     "onnxruntime-web": "^1.21.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-hotkeys-hook": "^5.3.3",
+    "react-zoom-pan-pinch": "^4.2.0",
+    "zundo": "^2.3.0",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

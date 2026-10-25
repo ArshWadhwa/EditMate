@@ -22,7 +22,7 @@ import { StraightenDial } from './features/controls/StraightenDial.jsx';
 import { useFocusNavigation } from './features/controls/ControlPad.jsx';
 import { SavePresetDialog } from './features/presets/SavePresetDialog.jsx';
 import { ACCEPT_ATTR, firstImageFile } from './lib/image.js';
-import { useHotkeys } from './lib/useHotkeys.js';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { DESKTOP_QUERY, useMediaQuery } from './lib/useMediaQuery.js';
 
 export default function App() {
@@ -62,64 +62,41 @@ function Editor() {
     return true;
   };
 
-  const TOGGLES = {
-    c: () => setUi((u) => ({ compare: !u.compare })),
-    g: () => setUi((u) => ({ grid: !u.grid })),
-    r: () => setUi((u) => ({ tool: u.tool === 'crop' ? 'adjust' : 'crop' })),
-    a: () => setUi({ tool: 'adjust' }),
-    b: () => setUi({ tool: 'background' }),
-    l: () => setUi({ tool: 'layers' }),
-    t: () => layerActions.addText(),
-  };
+  // Global shortcuts
+  useHotkeys('mod+o', (e) => { e.preventDefault(); chooseFile(); });
+  useHotkeys('mod+z', (e) => { e.preventDefault(); if (image) editor.undo(); });
+  useHotkeys('mod+shift+z, mod+y', (e) => { e.preventDefault(); if (image) editor.redo(); });
+  useHotkeys('mod+e', (e) => { e.preventDefault(); if (image) editor.exportImage(); });
+  useHotkeys('mod+d', (e) => { e.preventDefault(); if (image && layerActions.selected) layerActions.duplicate(layerActions.selected.id); });
+  useHotkeys('shift+/', () => setShortcutsOpen(true));
 
-  useHotkeys(
-    (e, { mod, key, ownsArrows }) => {
-      if (mod) {
-        if (key === 'o') return run(chooseFile);
-        if (!image) return false;
-        if (key === 'z') return run(e.shiftKey ? editor.redo : editor.undo);
-        if (key === 'y') return run(editor.redo);
-        if (key === 'e') return run(editor.exportImage);
-        if (key === 'd' && layerActions.selected) return run(() => layerActions.duplicate(layerActions.selected.id));
-        return false;
-      }
-      if (e.altKey || e.ctrlKey || e.metaKey) return false;
-      if (key === '?') return run(() => setShortcutsOpen(true));
-      if (!image) return false;
+  // Tool shortcuts
+  useHotkeys('c', () => image && setUi((u) => ({ compare: !u.compare })));
+  useHotkeys('g', () => image && setUi((u) => ({ grid: !u.grid })));
+  useHotkeys('r', () => image && setUi((u) => ({ tool: u.tool === 'crop' ? 'adjust' : 'crop' })));
+  useHotkeys('a', () => image && setUi({ tool: 'adjust' }));
+  useHotkeys('b', () => image && setUi({ tool: 'background' }));
+  useHotkeys('l', () => image && setUi({ tool: 'layers' }));
+  useHotkeys('t', () => image && layerActions.addText());
 
-      if (ui.tool === 'crop') {
-        // Enter on a focused button should press that button, not apply the crop.
-        if (key === 'Enter' && !(e.target instanceof HTMLButtonElement)) return run(crop.applyCrop);
-        if (key === 'Escape') return run(crop.cancelCrop);
-        if (key === 'x') return run(crop.togglePortrait);
-      }
-      if (key === '\\') return run(() => !e.repeat && setUi({ showOriginal: true }));
+  // Show original (hold backslash)
+  useHotkeys('backslash', () => image && setUi({ showOriginal: true }), { keydown: true });
+  useHotkeys('backslash', () => image && setUi({ showOriginal: false }), { keyup: true });
 
-      // A selected layer takes Delete, Escape and the arrow keys.
-      const layer = layerActions.selected;
-      if (layer && ui.tool !== 'crop') {
-        if (key === 'Delete' || key === 'Backspace') return run(() => layerActions.remove(layer.id));
-        if (key === 'Escape') return run(() => layerActions.select(null));
-        const nudge = e.shiftKey ? 0.02 : 0.002;
-        const moves = { ArrowLeft: [-nudge, 0], ArrowRight: [nudge, 0], ArrowUp: [0, -nudge], ArrowDown: [0, nudge] };
-        if (moves[key] && !ownsArrows) return run(() => layerActions.nudge(layer.id, ...moves[key]));
-      }
+  // Layer keys
+  useHotkeys('backspace, delete', () => {
+    if (image && layerActions.selected && ui.tool !== 'crop') layerActions.remove(layerActions.selected.id);
+  });
+  useHotkeys('escape', () => {
+    if (ui.tool === 'crop') crop.cancelCrop();
+    else if (layerActions.selected) layerActions.select(null);
+  });
 
-      if (TOGGLES[key]) return run(TOGGLES[key]);
-
-      if (ownsArrows || ui.tool === 'crop') return false;
-      const step = e.shiftKey ? 10 : 1;
-      if (key === 'ArrowUp') return run(() => focus.move(-1));
-      if (key === 'ArrowDown') return run(() => focus.move(1));
-      if (key === 'ArrowLeft') return run(() => focus.nudge(-step));
-      if (key === 'ArrowRight') return run(() => focus.nudge(step));
-      return false;
-    },
-    (_e, { key }) => {
-      if (key === '\\') setUi({ showOriginal: false });
-      if (key === 'ArrowLeft' || key === 'ArrowRight') focus.commit();
-    },
-  );
+  // Slider navigation
+  useHotkeys('up', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.move(-1); } });
+  useHotkeys('down', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.move(1); } });
+  useHotkeys('left', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.nudge(e.shiftKey ? -10 : -1); } });
+  useHotkeys('right', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.nudge(e.shiftKey ? 10 : 1); } });
 
   // Safety net: any drop or cancelled drag anywhere ends the overlay, even if a child handled it.
   useEffect(() => {

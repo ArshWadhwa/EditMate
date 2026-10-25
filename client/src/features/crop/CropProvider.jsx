@@ -1,7 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useEditor } from '../../state/EditorProvider.jsx';
-import { effectiveCrop, totalRotation } from '../../engine/geometry.js';
-import { constrainRect, createFrame, fitAspect, fromFractions, largestRect, toFractions } from '../../engine/cropMath.js';
+import {
+  constrainRect,
+  createFrame,
+  effectiveCrop,
+  fitAspect,
+  fromFractions,
+  largestRect,
+  toFractions,
+  totalRotation,
+} from '../../engine/geometry.js';
 
 /** `ratio` is [w, h] in landscape terms; `swap` flips it to portrait. */
 export const ASPECTS = [

@@ -104,3 +104,38 @@ export function downscale(canvas, maxSize) {
 
 export const readPixels = (canvas) =>
   canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, canvas.width, canvas.height);
+
+/**
+ * Crop frame and fraction utilities (used with Cropper.js).
+ */
+export function createFrame(imageWidth, imageHeight, degrees) {
+  const rad = (degrees * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  return {
+    W: imageWidth * cos + imageHeight * sin,
+    H: imageWidth * sin + imageHeight * cos,
+    w: imageWidth,
+    h: imageHeight,
+    rad,
+  };
+}
+
+export function fitAspect(rect, aspect) {
+  if (!aspect) return rect;
+  let width = rect.width;
+  let height = width / aspect;
+  if (height > rect.height) {
+    height = rect.height;
+    width = height * aspect;
+  }
+  return { x: rect.x + (rect.width - width) / 2, y: rect.y + (rect.height - height) / 2, width, height };
+}
+
+export function largestRect(frame, aspect) {
+  return fitAspect({ x: 0, y: 0, width: frame.W, height: frame.H }, aspect ?? frame.w / frame.h);
+}
+
+export const constrainRect = (_frame, _valid, next) => next;
+export const toFractions = (frame, r) => ({ x: r.x / frame.W, y: r.y / frame.H, width: r.width / frame.W, height: r.height / frame.H });
+export const fromFractions = (frame, f) => ({ x: f.x * frame.W, y: f.y * frame.H, width: f.width * frame.W, height: f.height * frame.H });

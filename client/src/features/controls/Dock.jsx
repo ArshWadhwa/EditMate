@@ -4,7 +4,7 @@
 
 import { Bookmark, Sparkles } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
-import { Panel, Segmented } from '../../components/ui.jsx';
+import { Panel, Segmented, cx } from '../../components/ui.jsx';
 import { InspireDock } from '../inspire/InspireDock.jsx';
 import { PresetsDock } from '../presets/PresetsDock.jsx';
 import { ControlPad } from './ControlPad.jsx';
@@ -14,11 +14,11 @@ const TABS = [
   { value: 'presets', label: 'Presets', icon: Bookmark },
 ];
 
-export function Dock({ onSavePreset }) {
+export function Dock({ className, onSavePreset }) {
   const { image, ui, setUi } = useEditor();
 
   return (
-    <Panel className="flex min-w-0 gap-5 p-4">
+    <Panel className={cx('flex min-w-0 gap-5 p-4', className)}>
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <Segmented label="Dock" size="sm" className="w-fit" value={ui.dock} onChange={(dock) => setUi({ dock })} options={TABS} />
         <div className="flex min-h-0 flex-1 flex-col gap-5 sm:flex-row">

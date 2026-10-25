@@ -15,23 +15,30 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Image as ImageIcon,
   ImagePlus,
   Italic,
+  Lock,
   Minus,
+  PaintBucket,
+  ScanFace,
   Square,
   Trash2,
   Type,
+  Unlock,
 } from 'lucide-react';
+import { useEditor } from '../../state/EditorProvider.jsx';
 import { BLEND_MODES, FONTS } from '../../engine/layers.js';
 import { ACCEPT_ATTR, firstImageFile } from '../../lib/image.js';
 import { useToast } from '../../components/Toaster.jsx';
 import { Panel, cx } from '../../components/ui.jsx';
 import { ColorField, RangeField, ToggleRow } from '../../components/fields.jsx';
+import { DESKTOP_QUERY, useMediaQuery } from '../../lib/useMediaQuery.js';
 import { useLayerActions } from './useLayerActions.js';
 
-const TYPE_ICONS = { text: Type, image: ImagePlus };
+const TYPE_ICONS = { text: Type, image: ImagePlus, subject: ScanFace };
 const SHAPE_ICONS = { rect: Square, ellipse: Circle, line: Minus, arrow: ArrowRight };
-const iconFor = (layer) => (layer.type === 'shape' ? SHAPE_ICONS[layer.shape] : TYPE_ICONS[layer.type]);
+const iconFor = (layer) => (layer.type === 'shape' ? SHAPE_ICONS[layer.shape] : (TYPE_ICONS[layer.type] || Type));
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 
@@ -51,6 +58,7 @@ function AddButton({ label, icon: Icon, onClick }) {
 
 export function LayersPanel() {
   const toast = useToast();
+  const desktop = useMediaQuery(DESKTOP_QUERY);
   const { layers, selected, select, addText, addShape, addImage, remove, duplicate, reorder, update, previewUpdate, commit } = useLayerActions();
   const fileRef = useRef(null);
 
@@ -90,52 +98,120 @@ export function LayersPanel() {
         />
       </div>
 
-      {layers.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-[12px] leading-relaxed text-white/40">
-          No layers yet. Add text, a shape or a photo.
-          <br />
-          Drag on the canvas to move, use the handles to resize and rotate.
-        </p>
-      ) : (
-        <ul className="mt-5 space-y-1" aria-label="Layers, top first">
-          {[...layers].reverse().map((layer) => {
-            const Icon = iconFor(layer);
-            const isSelected = selected?.id === layer.id;
-            const index = layers.indexOf(layer);
-            return (
-              <li key={layer.id}>
-                <div
-                  className={cx(
-                    'group flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors',
-                    isSelected ? 'bg-ink-700 ring-1 ring-sky/60' : 'hover:bg-white/[0.04]',
-                  )}
-                >
-                  <button type="button" onClick={() => select(layer.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                    <Icon className={cx('size-4 shrink-0', layer.hidden ? 'text-white/25' : 'text-white/70')} />
-                    <span className={cx('truncate text-[12px] font-semibold', layer.hidden && 'text-white/35')}>
-                      {layer.type === 'text' ? layer.text.split('\n')[0] || 'Text' : layer.name}
-                    </span>
-                  </button>
-                  <div className={cx('flex shrink-0 gap-0.5', !isSelected && 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100')}>
-                    <IconAction label="Bring forward" disabled={index === layers.length - 1} onClick={() => reorder(layer.id, 1)} icon={ArrowUp} />
-                    <IconAction label="Send backward" disabled={index === 0} onClick={() => reorder(layer.id, -1)} icon={ArrowDown} />
-                    <IconAction label="Duplicate" onClick={() => duplicate(layer.id)} icon={Copy} />
-                    <IconAction label="Delete" onClick={() => remove(layer.id)} icon={Trash2} />
-                  </div>
-                  <IconAction
-                    label={layer.hidden ? 'Show' : 'Hide'}
-                    onClick={() => update(layer.id, { hidden: !layer.hidden })}
-                    icon={layer.hidden ? EyeOff : Eye}
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+      {!desktop && (
+        <>
+          {layers.length === 0 ? (
+            <p className="mt-6 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-[12px] leading-relaxed text-white/40">
+              No layers yet. Add text, a shape or a photo.
+            </p>
+          ) : (
+            <ul className="mt-5 space-y-1" aria-label="Layers, top first">
+              {[...layers].reverse().map((layer) => {
+                const Icon = iconFor(layer);
+                const isSelected = selected?.id === layer.id;
+                const index = layers.indexOf(layer);
+                return (
+                  <li key={layer.id}>
+                    <div
+                      className={cx(
+                        'group flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors',
+                        isSelected ? 'bg-ink-700 ring-1 ring-sky/60' : 'hover:bg-white/[0.04]',
+                      )}
+                    >
+                      <button type="button" onClick={() => select(layer.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                        <Icon className={cx('size-4 shrink-0', layer.hidden ? 'text-white/25' : 'text-white/70')} />
+                        <span className={cx('truncate text-[12px] font-semibold', layer.hidden && 'text-white/35')}>
+                          {layer.type === 'text' ? layer.text.split('\n')[0] || 'Text' : layer.name}
+                        </span>
+                        {layer.locked && <Lock className="size-3 text-amber-400 shrink-0 ml-1" title="Locked" />}
+                      </button>
+                      <div className={cx('flex shrink-0 gap-0.5', !isSelected && 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100')}>
+                        <IconAction
+                          label={layer.locked ? 'Unlock' : 'Lock'}
+                          onClick={() => {
+                            const nextLocked = !layer.locked;
+                            update(layer.id, { locked: nextLocked });
+                            if (nextLocked && selected?.id === layer.id) select(null);
+                          }}
+                          icon={layer.locked ? Lock : Unlock}
+                        />
+                        <IconAction label="Bring forward" disabled={index === layers.length - 1} onClick={() => reorder(layer.id, 1)} icon={ArrowUp} />
+                        <IconAction label="Send backward" disabled={index === 0} onClick={() => reorder(layer.id, -1)} icon={ArrowDown} />
+                        <IconAction label="Duplicate" onClick={() => duplicate(layer.id)} icon={Copy} />
+                        <IconAction label="Delete" onClick={() => remove(layer.id)} icon={Trash2} />
+                      </div>
+                      <IconAction
+                        label={layer.hidden ? 'Show' : 'Hide'}
+                        onClick={() => update(layer.id, { hidden: !layer.hidden })}
+                        icon={layer.hidden ? EyeOff : Eye}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
 
-      {selected && (
+      {selected ? (
         <section className="mt-5 space-y-4 border-t border-white/5 pt-5" aria-label="Layer properties">
+          <div className="flex items-center justify-between pb-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="hairline grid size-7 place-items-center rounded-lg bg-ink-700 text-sky">
+                {(() => {
+                  const Icon = iconFor(selected);
+                  return <Icon className="size-4" />;
+                })()}
+              </span>
+              <span className="truncate text-[13px] font-bold text-white">
+                {selected.type === 'text' ? (selected.text.split('\n')[0] || 'Text') : selected.name}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextLocked = !selected.locked;
+                  set({ locked: nextLocked });
+                  if (nextLocked) select(null);
+                }}
+                className={cx(
+                  'flex h-7 items-center gap-1.5 rounded-lg px-2 text-[11px] font-bold transition',
+                  selected.locked ? 'bg-amber-400/20 text-amber-400 ring-1 ring-amber-400/40' : 'bg-ink-700 text-white/70 hover:bg-ink-600 hover:text-white',
+                )}
+                title={selected.locked ? 'Unlock layer' : 'Lock layer (make non-selectable on canvas)'}
+              >
+                {selected.locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+                {selected.locked ? 'Locked' : 'Lock'}
+              </button>
+              <button
+                type="button"
+                onClick={() => set({ hidden: !selected.hidden })}
+                className="grid size-7 place-items-center rounded-lg bg-ink-700 text-white/70 hover:bg-ink-600 hover:text-white"
+                title={selected.hidden ? 'Show layer' : 'Hide layer'}
+              >
+                {selected.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => duplicate(selected.id)}
+                className="grid size-7 place-items-center rounded-lg bg-ink-700 text-white/70 hover:bg-ink-600 hover:text-white"
+                title="Duplicate layer"
+              >
+                <Copy className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => remove(selected.id)}
+                className="grid size-7 place-items-center rounded-lg bg-ink-700 text-rec hover:bg-rec/20"
+                title="Delete layer"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          </div>
+
           {selected.type === 'text' && <TextProperties layer={selected} live={live} set={set} commit={commit} />}
           {selected.type === 'shape' && <ShapeProperties layer={selected} live={live} set={set} commit={commit} />}
 
@@ -165,7 +241,14 @@ export function LayersPanel() {
             </select>
           </label>
         </section>
-      )}
+      ) : desktop ? (
+        <div className="mt-8 flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-6 text-center text-white/40">
+          <p className="text-[13px] font-semibold text-white/60">No layer selected</p>
+          <p className="mt-1.5 text-[11px] leading-relaxed">
+            Select a layer from the Layer Stack in the bottom right, or click an element on the canvas to edit.
+          </p>
+        </div>
+      ) : null}
     </Panel>
   );
 }
@@ -270,10 +353,122 @@ function StyleToggle({ label, icon: Icon, active, onClick, disabled }) {
 }
 
 function ShapeProperties({ layer, live, set, commit }) {
+  const { assets } = useEditor();
+  const toast = useToast();
+  const fileRef = useRef(null);
   const linear = layer.shape === 'line' || layer.shape === 'arrow';
+  const shapeAsset = layer.assetId ? (assets?.map?.get ? assets.map.get(layer.assetId) : null) : null;
+  const fillType = layer.fillType || (layer.assetId ? 'image' : 'color');
+
+  const onChooseImage = async (file) => {
+    try {
+      const asset = await assets.add(file);
+      set({ fillType: 'image', assetId: asset.id });
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   return (
     <>
-      {!linear && <ColorField label="Fill" value={layer.fill} allowNone onChange={(fill) => set({ fill })} onLive={(fill) => live({ fill })} onCommit={commit} />}
+      {!linear && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] font-semibold text-white/70">Fill</span>
+            <div className="flex rounded-xl bg-ink-950 p-1">
+              <button
+                type="button"
+                onClick={() => set({ fillType: 'color' })}
+                className={cx(
+                  'flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold transition-colors',
+                  fillType === 'color' ? 'bg-ink-700 text-white shadow-sm' : 'text-white/45 hover:text-white',
+                )}
+              >
+                <PaintBucket className="size-3" />
+                Colour
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  set({ fillType: 'image' });
+                  if (!shapeAsset) fileRef.current?.click();
+                }}
+                className={cx(
+                  'flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold transition-colors',
+                  fillType === 'image' ? 'bg-ink-700 text-white shadow-sm' : 'text-white/45 hover:text-white',
+                )}
+              >
+                <ImageIcon className="size-3" />
+                Photo
+              </button>
+            </div>
+          </div>
+
+          {fillType === 'color' ? (
+            <ColorField
+              label="Fill colour"
+              value={layer.fill}
+              allowNone
+              onChange={(fill) => set({ fill })}
+              onLive={(fill) => live({ fill })}
+              onCommit={commit}
+            />
+          ) : (
+            <div className="space-y-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept={ACCEPT_ATTR}
+                hidden
+                onChange={(e) => {
+                  const file = firstImageFile(e.target.files);
+                  if (file) onChooseImage(file);
+                  e.target.value = '';
+                }}
+              />
+              {shapeAsset ? (
+                <div className="flex items-center gap-3 rounded-xl bg-ink-950 p-2.5 ring-1 ring-white/10">
+                  <img
+                    src={shapeAsset.url}
+                    alt=""
+                    className="hairline size-12 shrink-0 rounded-lg object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-bold text-white">{shapeAsset.name}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="text-[11px] font-bold text-sky hover:underline"
+                      >
+                        Change photo
+                      </button>
+                      <span className="text-[11px] text-white/30">•</span>
+                      <button
+                        type="button"
+                        onClick={() => set({ assetId: null, fillType: 'color' })}
+                        className="text-[11px] font-bold text-red-400 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-ink-950 text-[12px] font-bold text-white/80 hover:border-sky/50 hover:bg-ink-900 hover:text-white transition"
+                >
+                  <ImageIcon className="size-4 text-sky" />
+                  Choose photo to fill shape
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <ColorField
         label={linear ? 'Colour' : 'Outline'}
         value={layer.stroke}

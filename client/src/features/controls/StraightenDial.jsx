@@ -3,15 +3,15 @@
  */
 
 import { useRef } from 'react';
-import { FlipHorizontal2, RotateCcwSquare } from 'lucide-react';
+import { FlipHorizontal2, RotateCcw, RotateCcwSquare } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { outputSize } from '../../engine/geometry.js';
 import { signedFixed } from '../../lib/format.js';
 import { Panel, cx } from '../../components/ui.jsx';
 import { useGeometryActions } from '../crop/CropProvider.jsx';
 
-const LIMIT = 45;
-const DIAL_RATIO = 2;
+const LIMIT = 180;
+const DIAL_RATIO = 1;
 
 const round1 = (v) => Math.round(v * 10) / 10;
 const clampAngle = (v) => Math.max(-LIMIT, Math.min(LIMIT, v));
@@ -29,10 +29,10 @@ const TICKS = Array.from({ length: 120 }, (_, i) => {
 });
 
 const LABELS = [
-  [0, '0'],
-  [90, '+45'],
-  [180, '±'],
-  [270, '−45'],
+  [0, '0°'],
+  [90, '90°'],
+  [180, '180°'],
+  [270, '270°'],
 ].map(([a, text]) => {
   const [x, y] = polar(a, 68);
   return { key: a, x, y: y + 3, text };
@@ -131,6 +131,16 @@ export function StraightenDial() {
       <div className="absolute inset-x-4 bottom-3 flex items-center justify-between gap-2">
         <span className="num truncate text-[10px] text-white/45">{size ? `${size.width} × ${size.height}` : 'No photo'}</span>
         <div className="flex gap-1.5">
+          <button
+            type="button"
+            disabled={disabled || value === 0}
+            onClick={() => setStraighten(0)}
+            title="Reset rotation (0°)"
+            aria-label="Reset rotation"
+            className="grid size-7 place-items-center rounded-full bg-ink-700 hover:bg-ink-600 disabled:opacity-30"
+          >
+            <RotateCcw className="size-3.5" />
+          </button>
           <button type="button" disabled={disabled} onClick={rotateLeft} title="Rotate left 90°" aria-label="Rotate left 90°" className="grid size-7 place-items-center rounded-full bg-ink-700 hover:bg-ink-600 disabled:opacity-30">
             <RotateCcwSquare className="size-3.5" />
           </button>

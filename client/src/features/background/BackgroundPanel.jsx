@@ -9,6 +9,8 @@ import { ACCEPT_ATTR, firstImageFile } from '../../lib/image.js';
 import { useToast } from '../../components/Toaster.jsx';
 import { Panel, cx } from '../../components/ui.jsx';
 import { ColorField, RangeField } from '../../components/fields.jsx';
+import { createSubjectLayer } from '../../engine/layers.js';
+import { useDocStore } from '../../state/docStore.js';
 
 const MODES = [
   { key: 'transparent', label: 'Remove', icon: ScanFace },
@@ -38,14 +40,36 @@ export function BackgroundPanel() {
       return;
     }
     const mask = await subject.ensureMask();
-    if (mask) apply({ background: { mode } });
+    if (mask) {
+      const currentLayers = useDocStore.getState().doc.layers;
+      const hasSubject = currentLayers.some((l) => l.type === 'subject' || l.isSubject);
+      if (!hasSubject) {
+        apply({
+          background: { mode },
+          layers: [...currentLayers, createSubjectLayer()],
+        });
+      } else {
+        apply({ background: { mode } });
+      }
+    }
   };
 
   const chooseImage = async (file) => {
     try {
       const asset = await assets.add(file);
       const mask = await subject.ensureMask();
-      if (mask) apply({ background: { mode: 'image', assetId: asset.id } });
+      if (mask) {
+        const currentLayers = useDocStore.getState().doc.layers;
+        const hasSubject = currentLayers.some((l) => l.type === 'subject' || l.isSubject);
+        if (!hasSubject) {
+          apply({
+            background: { mode: 'image', assetId: asset.id },
+            layers: [...currentLayers, createSubjectLayer()],
+          });
+        } else {
+          apply({ background: { mode: 'image', assetId: asset.id } });
+        }
+      }
     } catch (err) {
       toast.error(err.message);
     }
@@ -118,11 +142,24 @@ export function BackgroundPanel() {
         )}
 
         {background.mode === 'image' && (
-          <div className="flex items-center gap-3">
-            {backgroundAsset && <img src={backgroundAsset.url} alt="" className="hairline h-12 w-16 rounded-lg object-cover" />}
-            <button type="button" onClick={() => fileRef.current?.click()} className="h-9 rounded-xl bg-ink-700 px-4 text-[12px] font-bold hover:bg-ink-600">
-              {backgroundAsset ? 'Change photo' : 'Choose photo'}
-            </button>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              {backgroundAsset && <img src={backgroundAsset.url} alt="" className="hairline h-12 w-16 rounded-lg object-cover" />}
+              <button type="button" onClick={() => fileRef.current?.click()} className="h-9 rounded-xl bg-ink-700 px-4 text-[12px] font-bold hover:bg-ink-600">
+                {backgroundAsset ? 'Change photo' : 'Choose photo'}
+              </button>
+            </div>
+            {backgroundAsset && (
+              <RangeField
+                label="Background blur"
+                value={background.imageBlur ?? 0}
+                min={0}
+                max={100}
+                format={(v) => `${v}%`}
+                onChange={(imageBlur) => preview({ background: { imageBlur, blur: imageBlur } })}
+                onCommit={commit}
+              />
+            )}
           </div>
         )}
 
@@ -140,7 +177,10 @@ export function BackgroundPanel() {
         {background.mode !== 'original' && (
           <button
             type="button"
-            onClick={() => apply({ background: { mode: 'original' } })}
+            onClick={() => {
+              const remainingLayers = useDocStore.getState().doc.layers.filter((l) => l.type !== 'subject' && !l.isSubject);
+              apply({ background: { mode: 'original' }, layers: remainingLayers });
+            }}
             className="flex items-center gap-2 text-[12px] font-bold text-white/60 hover:text-white"
           >
             <Undo2 className="size-3.5" />

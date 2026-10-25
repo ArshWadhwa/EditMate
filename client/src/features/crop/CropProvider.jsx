@@ -35,6 +35,7 @@ export function CropProvider({ children }) {
   const [portrait, setPortrait] = useState(false);
   const [custom, setCustomState] = useState({ w: 7, h: 5 });
   const [rect, setRect] = useState(null);
+  const [resetSignal, setResetSignal] = useState(0);
 
   const rotation = image ? totalRotation(geometry) : 0;
   const frame = useMemo(() => (image ? createFrame(image.width, image.height, rotation) : null), [image, rotation]);
@@ -78,7 +79,12 @@ export function CropProvider({ children }) {
 
   const setCustom = useCallback((patch) => setCustomState((c) => ({ w: clampRatioPart(patch.w ?? c.w), h: clampRatioPart(patch.h ?? c.h) })), []);
 
-  const resetBox = useCallback(() => frame && setRect(largestRect(frame, aspect)), [frame, aspect]);
+  const resetBox = useCallback(() => {
+    if (frame) {
+      setRect(largestRect(frame, aspect));
+      setResetSignal((s) => s + 1);
+    }
+  }, [frame, aspect]);
 
   const applyCrop = useCallback(() => {
     if (rect && frame) {
@@ -86,10 +92,15 @@ export function CropProvider({ children }) {
       const untouched = !geometry.straighten && Math.abs(rect.width - full.width) < 1 && Math.abs(rect.height - full.height) < 1;
       apply({ geometry: { crop: untouched ? null : toFractions(frame, rect) } });
     }
-    setUi({ tool: 'adjust' });
-  }, [rect, frame, geometry.straighten, apply, setUi]);
+  }, [rect, frame, geometry.straighten, apply]);
 
-  const cancelCrop = useCallback(() => setUi({ tool: 'adjust' }), [setUi]);
+  const cancelCrop = useCallback(() => {
+    if (frame && image) {
+      const start = fromFractions(frame, effectiveCrop(image.width, image.height, geometry));
+      setRect(aspect ? fitAspect(start, aspect) : start);
+      setResetSignal((s) => s + 1);
+    }
+  }, [frame, image, geometry, aspect]);
 
   const value = useMemo(
     () => ({
@@ -105,10 +116,11 @@ export function CropProvider({ children }) {
       custom,
       setCustom,
       resetBox,
+      resetSignal,
       applyCrop,
       cancelCrop,
     }),
-    [frame, rect, aspect, ratio, aspectKey, setAspect, portrait, custom, setCustom, resetBox, applyCrop, cancelCrop],
+    [frame, rect, aspect, ratio, aspectKey, setAspect, portrait, custom, setCustom, resetBox, resetSignal, applyCrop, cancelCrop],
   );
 
   return <CropContext.Provider value={value}>{children}</CropContext.Provider>;

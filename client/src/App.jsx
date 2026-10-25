@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ImageUp, ShieldCheck, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, ImageUp, Lock, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, Unlock } from 'lucide-react';
 import { ToastProvider } from './components/Toaster.jsx';
 import { ShortcutsDialog } from './components/ShortcutsDialog.jsx';
 import { Panel, cx } from './components/ui.jsx';
@@ -71,7 +71,6 @@ function Editor() {
   useHotkeys('c', () => image && setUi((u) => ({ compare: !u.compare })));
   useHotkeys('g', () => image && setUi((u) => ({ grid: !u.grid })));
   useHotkeys('r', () => image && setUi((u) => ({ tool: u.tool === 'crop' ? 'adjust' : 'crop' })));
-  useHotkeys('a', () => image && setUi({ tool: 'adjust' }));
   useHotkeys('b', () => image && setUi({ tool: 'background' }));
   useHotkeys('l', () => image && setUi({ tool: 'layers' }));
   useHotkeys('t', () => image && layerActions.addText());
@@ -87,10 +86,10 @@ function Editor() {
     else if (layerActions.selected) layerActions.select(null);
   });
 
-  useHotkeys('up', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.move(-1); } });
-  useHotkeys('down', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.move(1); } });
-  useHotkeys('left', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.nudge(e.shiftKey ? -10 : -1); } });
-  useHotkeys('right', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.nudge(e.shiftKey ? 10 : 1); } });
+  useHotkeys('up', (e) => { if (image) { e.preventDefault(); focus.move(-1); } });
+  useHotkeys('down', (e) => { if (image) { e.preventDefault(); focus.move(1); } });
+  useHotkeys('left', (e) => { if (image) { e.preventDefault(); focus.nudge(e.shiftKey ? -5 : -1); focus.commit?.(); } });
+  useHotkeys('right', (e) => { if (image) { e.preventDefault(); focus.nudge(e.shiftKey ? 5 : 1); focus.commit?.(); } });
 
   useEffect(() => {
     const reset = () => {
@@ -173,11 +172,126 @@ function DesktopLayout({ onOpenFile, onShowShortcuts, onSavePreset }) {
         <main className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_320px] grid-rows-[minmax(0,1fr)_236px] gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
           <Viewport onOpenFile={onOpenFile} />
           {!image ? <IdlePanel /> : <ToolPanel tool={ui.tool} onSavePreset={() => onSavePreset()} />}
-          <Dock onSavePreset={onSavePreset} />
-          <StraightenDial />
+          {ui.tool === 'crop' ? (
+            <>
+              <Dock onSavePreset={onSavePreset} />
+              <StraightenDial />
+            </>
+          ) : ui.tool === 'layers' ? (
+            <>
+              <Dock onSavePreset={onSavePreset} />
+              <LayerStackDock />
+            </>
+          ) : (
+            <div className="col-span-2 min-h-0 min-w-0 flex">
+              <Dock className="size-full" onSavePreset={onSavePreset} />
+            </div>
+          )}
         </main>
       </div>
     </div>
+  );
+}
+
+function LayerStackDock() {
+  const { layers, selected, select, reorder, remove, update, addText, addShape } = useLayerActions();
+  return (
+    <Panel className="flex flex-col p-4 overflow-hidden">
+      <div className="flex items-center justify-between">
+        <p className="label">Layer Stack</p>
+        <span className="num text-[11px] text-white/45">
+          {layers.length} {layers.length === 1 ? 'layer' : 'layers'}
+        </span>
+      </div>
+      <div className="scrollbar-thin mt-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+        {layers.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-white/35">
+            <p className="text-[11px]">No layers yet</p>
+            <div className="flex gap-1.5">
+              <button type="button" onClick={addText} className="hairline rounded-lg bg-ink-700 px-2 py-1 text-[10px] font-bold hover:bg-ink-600">
+                + Text
+              </button>
+              <button type="button" onClick={() => addShape('rect')} className="hairline rounded-lg bg-ink-700 px-2 py-1 text-[10px] font-bold hover:bg-ink-600">
+                + Shape
+              </button>
+            </div>
+          </div>
+        ) : (
+          [...layers].reverse().map((layer) => {
+            const isSelected = selected?.id === layer.id;
+            const index = layers.indexOf(layer);
+            return (
+              <div
+                key={layer.id}
+                onClick={() => select(layer.id)}
+                className={cx(
+                  'group flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] cursor-pointer transition',
+                  isSelected ? 'bg-ink-700 text-white ring-1 ring-sky/50' : 'text-white/60 hover:bg-white/5 hover:text-white',
+                )}
+              >
+                <span className="flex items-center gap-1.5 truncate font-semibold max-w-[120px]">
+                  {layer.type === 'text' ? (layer.text.split('\n')[0] || 'Text') : layer.name}
+                  {layer.locked && <Lock className="size-2.5 text-amber-400 shrink-0" title="Locked" />}
+                </span>
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextLocked = !layer.locked;
+                      update(layer.id, { locked: nextLocked });
+                      if (nextLocked && selected?.id === layer.id) {
+                        select(null);
+                      }
+                    }}
+                    className={cx(
+                      'grid size-5 place-items-center rounded hover:bg-white/10',
+                      layer.locked ? 'text-amber-400 opacity-100' : 'text-white/60 hover:text-white',
+                    )}
+                    title={layer.locked ? 'Unlock layer' : 'Lock layer (non-selectable on canvas)'}
+                  >
+                    {layer.locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => update(layer.id, { hidden: !layer.hidden })}
+                    className="grid size-5 place-items-center rounded text-white/60 hover:bg-white/10 hover:text-white"
+                    title={layer.hidden ? 'Show layer' : 'Hide layer'}
+                  >
+                    {layer.hidden ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === layers.length - 1}
+                    onClick={() => reorder(layer.id, 1)}
+                    className="grid size-5 place-items-center rounded hover:bg-white/10 disabled:opacity-20"
+                    title="Bring forward"
+                  >
+                    <ArrowUp className="size-3" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => reorder(layer.id, -1)}
+                    className="grid size-5 place-items-center rounded hover:bg-white/10 disabled:opacity-20"
+                    title="Send backward"
+                  >
+                    <ArrowDown className="size-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(layer.id)}
+                    className="grid size-5 place-items-center rounded text-rec hover:bg-rec/20"
+                    title="Delete layer"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Panel>
   );
 }
 

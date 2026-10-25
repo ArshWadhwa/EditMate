@@ -55,7 +55,7 @@ export function AdjustPanel({ onSavePreset }) {
         options={ADJUSTMENT_GROUPS.map(({ key, label }) => ({ value: key, label }))}
       />
 
-      <div className="scrollbar-none -mx-5 mt-5 flex min-h-0 flex-1 flex-col justify-around gap-4 overflow-y-auto px-5 py-1">
+      <div className="scrollbar-thin -mx-5 mt-5 flex min-h-0 flex-1 flex-col justify-around gap-4 overflow-y-auto px-5 py-1">
         {visible.map((adjustment) => (
           <AdjustmentSlider
             key={adjustment.key}

@@ -2,7 +2,7 @@
  * Desktop side navigation rail for switching editing tools and viewing status.
  */
 
-import { Bookmark, Crop, Eraser, ImageUp, Keyboard, Layers, Redo2, SlidersHorizontal, Sparkles, Undo2 } from 'lucide-react';
+import { Crop, Eraser, ImageUp, Keyboard, Layers, Redo2, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { usePresets } from '../presets/PresetsProvider.jsx';
 import { API_STATUS_COPY } from '../../lib/useApiStatus.js';
@@ -56,12 +56,6 @@ export function Rail({ onOpenFile, onShowShortcuts }) {
         </RailButton>
         <RailButton label="Layers: text, shapes, photos" shortcut="L" disabled={noImage} active={!noImage && ui.tool === 'layers'} onClick={() => setUi({ tool: 'layers' })}>
           <Layers className="size-[18px]" />
-        </RailButton>
-        <RailButton label="Inspire" disabled={noImage} selected={!noImage && ui.dock === 'inspire'} onClick={() => setUi({ tool: 'adjust', dock: 'inspire' })}>
-          <Sparkles className="size-[18px]" />
-        </RailButton>
-        <RailButton label="Presets" disabled={noImage} selected={!noImage && ui.dock === 'presets'} onClick={() => setUi({ tool: 'adjust', dock: 'presets' })}>
-          <Bookmark className="size-[18px]" />
         </RailButton>
       </div>
 

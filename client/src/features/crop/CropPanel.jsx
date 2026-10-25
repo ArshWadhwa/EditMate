@@ -27,7 +27,7 @@ function RatioInput({ label, value, onChange }) {
 export function CropPanel() {
   const { geometry, resetGeometry } = useEditor();
   const { rect, ratio, aspectKey, setAspect, portrait, togglePortrait, custom, setCustom, resetBox, applyCrop, cancelCrop } = useCrop();
-  const { rotateLeft, rotateRight, flip } = useGeometryActions();
+  const { rotateLeft, rotateRight, flip, setStraighten } = useGeometryActions();
 
   const canSwap = ratio && ratio[0] !== ratio[1];
   const labelFor = ({ key, label }) => label ?? (aspectKey === key ? `${ratio[0]}:${ratio[1]}` : key);
@@ -98,7 +98,7 @@ export function CropPanel() {
         </RoundButton>
       </div>
       <p className="mt-4 text-[12px] leading-relaxed text-white/40">
-        Straighten with the dial. Flips apply after cropping, so the box shows the unflipped photo.
+        Straighten with the dial. Flips apply in real time across all tools.
       </p>
 
       <div className="mt-auto flex gap-2 pt-6">

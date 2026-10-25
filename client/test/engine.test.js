@@ -4,7 +4,8 @@ import { defaultAdjustments } from '@editmate/shared';
 import { applyAdjustments, toneCurve } from '../src/engine/pipeline.js';
 import { fitAdjustments, measure } from '../src/engine/analysis.js';
 import { autoStraightenCrop, outputSize } from '../src/engine/geometry.js';
-import { emptyDocument, useDocStore } from '../src/state/docStore.js';
+import { calculateEditCount, emptyDocument, useDocStore } from '../src/state/docStore.js';
+import { createShapeLayer } from '../src/engine/layers.js';
 
 /** Generates a synthetic RGBA gradient buffer with distinct color bands for pipeline testing. */
 function syntheticImage(width = 96, height = 64) {
@@ -153,3 +154,83 @@ describe('history (zustand store)', () => {
     assert.deepEqual(useDocStore.getState().doc.layers, []);
   });
 });
+
+describe('active edits count calculation', () => {
+  test('pristine document has zero active edits', () => {
+    assert.equal(calculateEditCount(emptyDocument()), 0);
+  });
+
+  test('adjustments increase edit count per non-zero value and decrease when reset', () => {
+    const doc = emptyDocument();
+    assert.equal(calculateEditCount(doc), 0);
+    doc.adjustments.brightness = 10;
+    assert.equal(calculateEditCount(doc), 1);
+    doc.adjustments.contrast = -5;
+    assert.equal(calculateEditCount(doc), 2);
+    doc.adjustments.brightness = 0;
+    assert.equal(calculateEditCount(doc), 1);
+    doc.adjustments.contrast = 0;
+    assert.equal(calculateEditCount(doc), 0);
+  });
+
+  test('crop, rotation, and flip each add to active edits count', () => {
+    const doc = emptyDocument();
+    doc.geometry.crop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+    assert.equal(calculateEditCount(doc), 1);
+    doc.geometry.straighten = 2.5;
+    assert.equal(calculateEditCount(doc), 2);
+    doc.geometry.flipH = true;
+    assert.equal(calculateEditCount(doc), 3);
+    doc.geometry.crop = null;
+    assert.equal(calculateEditCount(doc), 2);
+  });
+
+  test('background and layers add exactly per active layer and decrement on removal', () => {
+    const doc = emptyDocument();
+    doc.background.mode = 'blur';
+    assert.equal(calculateEditCount(doc), 1);
+    doc.layers.push({ id: '1', type: 'text' });
+    assert.equal(calculateEditCount(doc), 2);
+    doc.layers.push({ id: '2', type: 'shape' });
+    assert.equal(calculateEditCount(doc), 3);
+    doc.layers.pop();
+    assert.equal(calculateEditCount(doc), 2);
+    doc.background.mode = 'original';
+    assert.equal(calculateEditCount(doc), 1);
+    doc.layers.pop();
+    assert.equal(calculateEditCount(doc), 0);
+  });
+
+  test('subject layer with background mode is not double-counted', () => {
+    const doc = emptyDocument();
+    doc.background.mode = 'transparent';
+    doc.layers.push({ id: 's1', type: 'subject', isSubject: true });
+    assert.equal(calculateEditCount(doc), 1, 'background cutout + subject layer counts as 1 edit');
+    doc.layers.push({ id: 't1', type: 'text' });
+    assert.equal(calculateEditCount(doc), 2, 'adding text under or over subject adds 1 edit');
+  });
+
+  test('layer locking preserves active edit and layer properties', () => {
+    const doc = emptyDocument();
+    doc.layers.push({ id: '1', type: 'text', locked: false });
+    assert.equal(calculateEditCount(doc), 1);
+    doc.layers[0].locked = true;
+    assert.equal(doc.layers[0].locked, true);
+    assert.equal(calculateEditCount(doc), 1);
+  });
+
+  test('createShapeLayer initializes with default fillType and assetId', () => {
+    const rect = createShapeLayer('rect');
+    assert.equal(rect.type, 'shape');
+    assert.equal(rect.shape, 'rect');
+    assert.equal(rect.fillType, 'color');
+    assert.equal(rect.assetId, null);
+    assert.equal(rect.locked, false);
+
+    const ellipse = createShapeLayer('ellipse');
+    assert.equal(ellipse.shape, 'ellipse');
+    assert.equal(ellipse.fillType, 'color');
+    assert.equal(ellipse.assetId, null);
+  });
+});
+

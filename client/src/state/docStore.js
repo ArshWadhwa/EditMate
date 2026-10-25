@@ -23,6 +23,28 @@ export function mergeDocument(doc, patch) {
   };
 }
 
+export function calculateEditCount(doc) {
+  if (!doc) return 0;
+  let count = 0;
+  if (doc.adjustments) {
+    for (const val of Object.values(doc.adjustments)) {
+      if (val !== 0) count++;
+    }
+  }
+  if (doc.geometry) {
+    if (doc.geometry.crop !== null) count++;
+    if ((doc.geometry.quarterTurns ?? 0) !== 0 || (doc.geometry.straighten ?? 0) !== 0) count++;
+    if (doc.geometry.flipH === true) count++;
+  }
+  if (doc.background && doc.background.mode !== 'original') count++;
+  if (doc.layers) {
+    const bgCutout = doc.background && doc.background.mode !== 'original';
+    const activeLayers = bgCutout ? doc.layers.filter((l) => l.type !== 'subject' && !l.isSubject) : doc.layers;
+    count += activeLayers.length;
+  }
+  return count;
+}
+
 export const useDocStore = create((set, get) => ({
   doc: emptyDocument(),
   committed: emptyDocument(),

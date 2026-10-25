@@ -24,7 +24,7 @@ export const SHAPES = ['rect', 'ellipse', 'line', 'arrow'];
 
 export const BACKGROUND_MODES = ['original', 'transparent', 'color', 'image', 'blur'];
 
-export const defaultBackground = () => ({ mode: 'original', color: '#f4f1ea', assetId: null, blur: 40 });
+export const defaultBackground = () => ({ mode: 'original', color: '#f4f1ea', assetId: null, blur: 40, imageBlur: 0 });
 
 export const needsMask = (background) => background.mode !== 'original';
 
@@ -43,6 +43,7 @@ const base = (type, name) => ({
   opacity: 1,
   blend: 'source-over',
   hidden: false,
+  locked: false,
 });
 
 export function createTextLayer() {
@@ -71,6 +72,8 @@ export function createShapeLayer(shape = 'rect') {
     shape,
     w: linear ? 0.4 : 0.3,
     h: linear ? 0.06 : 0.3,
+    fillType: 'color',
+    assetId: null,
     fill: linear ? null : '#f4d35e',
     stroke: linear ? '#ffffff' : null,
     strokeWidth: linear ? 0.012 : 0.008,
@@ -81,6 +84,15 @@ export function createShapeLayer(shape = 'rect') {
 export function createImageLayer(assetId, name, aspect, outputAspect) {
   const w = 0.4;
   return { ...base('image', name || 'Image'), assetId, aspect, w, h: (w * outputAspect) / aspect };
+}
+
+export function createSubjectLayer() {
+  return {
+    ...base('subject', 'Subject Cutout'),
+    w: 1,
+    h: 1,
+    isSubject: true,
+  };
 }
 
 export function duplicateLayer(layer) {
@@ -200,15 +212,88 @@ export function layerBox(layer, W, H) {
   return { cx: layer.x * W, cy: layer.y * H, w: layer.w * W, h, rotation: layer.rotation };
 }
 
+function drawRoundRectPath(ctx, x, y, w, h, r) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, r);
+    return;
+  }
+  if (r <= 0) {
+    ctx.rect(x, y, w, h);
+    return;
+  }
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+export function drawShapeWithImage(ctx, layer, W, H, image) {
+  const cx = layer.x * W;
+  const cy = layer.y * H;
+  const w = Math.max(1, layer.w * W);
+  const h = Math.max(1, layer.h * H);
+  const rot = ((layer.rotation || 0) * Math.PI) / 180;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rot) ctx.rotate(rot);
+  ctx.globalAlpha = layer.opacity ?? 1;
+  if (layer.blend) ctx.globalCompositeOperation = layer.blend;
+
+  ctx.beginPath();
+  if (layer.shape === 'ellipse') {
+    ctx.ellipse(0, 0, Math.abs(w / 2), Math.abs(h / 2), 0, 0, Math.PI * 2);
+  } else {
+    const r = Math.max(0, Math.min((layer.radius ?? 0) * Math.min(w, h), Math.min(w, h) / 2));
+    drawRoundRectPath(ctx, -w / 2, -h / 2, w, h, r);
+  }
+
+  // Draw background fill if any color is set before clipping
+  if (layer.fill && layer.fill !== 'transparent') {
+    ctx.fillStyle = layer.fill;
+    ctx.fill();
+  }
+
+  // Clip to shape and draw image with cover aspect scaling
+  if (image) {
+    ctx.save();
+    ctx.clip();
+    const imgW = image.width || image.naturalWidth || 1;
+    const imgH = image.height || image.naturalHeight || 1;
+    const scale = Math.max(w / imgW, h / imgH);
+    const dw = imgW * scale;
+    const dh = imgH * scale;
+    ctx.drawImage(image, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
+  }
+
+  // Draw stroke / outline on top of the clipped image
+  if (layer.stroke && layer.strokeWidth > 0) {
+    ctx.strokeStyle = layer.stroke;
+    ctx.lineWidth = layer.strokeWidth * H;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 export function drawLayer(ctx, layer, W, H, assets) {
   if (layer.hidden) return;
 
   if (layer.type === 'text') {
     createTextObject(layer, W, H).render(ctx);
   } else if (layer.type === 'shape') {
-    createShapeObject(layer, W, H).render(ctx);
+    const isImageFill = (layer.fillType === 'image' || Boolean(layer.assetId)) && layer.shape !== 'line' && layer.shape !== 'arrow';
+    if (isImageFill) {
+      const asset = layer.assetId && assets ? (assets.get ? assets.get(layer.assetId) : assets[layer.assetId]) : null;
+      drawShapeWithImage(ctx, layer, W, H, asset?.bitmap || asset || null);
+    } else {
+      createShapeObject(layer, W, H).render(ctx);
+    }
   } else if (layer.type === 'image') {
-    const asset = assets.get(layer.assetId);
+    const asset = assets?.get ? assets.get(layer.assetId) : assets?.[layer.assetId];
     if (!asset) return;
     const box = layerBox(layer, W, H);
     ctx.save();

@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Cropper from 'cropperjs';
 import { useEditor } from '../../state/EditorProvider.jsx';
-import { renderGeometry } from '../../engine/geometry.js';
+import { renderGeometry, largestRect } from '../../engine/geometry.js';
 import { applyAdjustments } from '../../engine/pipeline.js';
 import { useCrop } from './CropProvider.jsx';
 
@@ -14,18 +14,19 @@ const DISPLAY_MAX = 1400;
 function useCropBackdrop() {
   const { image, geometry, adjustments } = useEditor();
   const canvas = useMemo(() => {
-    const out = renderGeometry(image.bitmap, { ...geometry, flipH: false, crop: { x: 0, y: 0, width: 1, height: 1 } }, DISPLAY_MAX);
+    const out = renderGeometry(image.bitmap, { ...geometry, crop: { x: 0, y: 0, width: 1, height: 1 } }, DISPLAY_MAX);
     const ctx = out.getContext('2d', { willReadFrequently: true });
     const pixels = ctx.getImageData(0, 0, out.width, out.height);
     applyAdjustments(pixels.data, pixels.data, out.width, out.height, adjustments);
     ctx.putImageData(pixels, 0, 0);
     return out;
-  }, [image, geometry.quarterTurns, geometry.straighten, adjustments]);
+  }, [image, geometry.quarterTurns, geometry.straighten, geometry.flipH, adjustments]);
   return canvas;
 }
 
 export function CropStage() {
-  const { frame, rect, setRect, aspect, applyCrop, cancelCrop } = useCrop();
+  const { geometry } = useEditor();
+  const { frame, rect, setRect, aspect, applyCrop, cancelCrop, resetSignal } = useCrop();
   const backdrop = useCropBackdrop();
   const imageRef = useRef(null);
   const cropperRef = useRef(null);
@@ -90,6 +91,24 @@ export function CropStage() {
       cropperRef.current.setAspectRatio(aspect || NaN);
     }
   }, [aspect]);
+
+  useEffect(() => {
+    if (cropperRef.current) {
+      cropperRef.current.scaleX(geometry.flipH ? -1 : 1);
+    }
+  }, [geometry.flipH]);
+
+  useEffect(() => {
+    if (!resetSignal || !cropperRef.current || !frame || !backdrop) return;
+    const maxRect = largestRect(frame, aspect);
+    const scale = backdrop.width / frame.W;
+    cropperRef.current.setData({
+      x: maxRect.x * scale,
+      y: maxRect.y * scale,
+      width: maxRect.width * scale,
+      height: maxRect.height * scale,
+    });
+  }, [resetSignal, frame, aspect, backdrop]);
 
   useEffect(() => {
     const onKeyDown = (e) => {

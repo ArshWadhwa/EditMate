@@ -13,6 +13,7 @@ export function CompareDivider({ split, zoom, onChange }) {
   };
 
   const onPointerDown = (e) => {
+    if (e.button !== 0) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     updateFromPointer(e);

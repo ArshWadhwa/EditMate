@@ -14,9 +14,9 @@ import { useSubjectMask } from './useSubjectMask.js';
 import { useExportSettings } from './useExportSettings.js';
 import { loadImageFile, releaseImage } from '../lib/image.js';
 import { useToast } from '../components/Toaster.jsx';
-import { emptyDocument, useDocStore } from './docStore.js';
+import { calculateEditCount, emptyDocument, useDocStore } from './docStore.js';
 
-export { emptyDocument, useDocStore };
+export { calculateEditCount, emptyDocument, useDocStore };
 
 export const PREVIEW_MAX = 1800;
 const THUMB_MAX = 200;
@@ -135,8 +135,8 @@ export function EditorProvider({ children }) {
       assets,
       canUndo: useDocStore.getState().past.length > 0,
       canRedo: useDocStore.getState().future.length > 0,
-      editCount: useDocStore.getState().past.length,
-      isPristine: isNeutral(adjustments) && !layers.length && !needsMask(background),
+      editCount: calculateEditCount(doc),
+      isPristine: calculateEditCount(doc) === 0,
       adjustmentsPristine: isNeutral(adjustments),
       isExported: exportedDoc !== null && exportedDoc === doc,
       exporting,

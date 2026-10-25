@@ -1,3 +1,7 @@
+/**
+ * Live RGB and luminance histogram visualization component.
+ */
+
 import { memo } from 'react';
 
 const CHANNEL_STYLE = {
@@ -8,14 +12,12 @@ const CHANNEL_STYLE = {
 };
 
 function toPath(bins, peak) {
-  // Square-root scaling keeps small populations visible next to a dominant peak.
   const scale = peak ? 100 / Math.sqrt(peak) : 0;
   let d = 'M0,100';
   for (let i = 0; i < 256; i++) d += `L${i},${(100 - Math.sqrt(bins[i]) * scale).toFixed(1)}`;
   return `${d}L255,100Z`;
 }
 
-/** Inner bins only: clipped 0/255 spikes would flatten everything else. */
 function peakOf(channels, histogram) {
   let peak = 0;
   for (const c of channels) {

@@ -1,13 +1,13 @@
+/**
+ * Mobile navigation bar and top bar controls for smaller screens.
+ */
+
 import { Bookmark, Crop, Eraser, ImageUp, Layers, Redo2, SlidersHorizontal, Sparkles, Undo2 } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { usePresets } from '../presets/PresetsProvider.jsx';
 import { API_STATUS_COPY } from '../../lib/useApiStatus.js';
 import { cx } from '../../components/ui.jsx';
 
-/**
- * Mobile tabs. Adjust, Inspire and Presets share the "adjust" tool and differ only in which
- * sheet is shown, matching the desktop dock tabs.
- */
 export const MOBILE_TABS = [
   { key: 'adjust', label: 'Adjust', icon: SlidersHorizontal, ui: { tool: 'adjust', sheet: 'adjust' } },
   { key: 'crop', label: 'Crop', icon: Crop, ui: { tool: 'crop' } },
@@ -17,7 +17,6 @@ export const MOBILE_TABS = [
   { key: 'presets', label: 'Presets', icon: Bookmark, ui: { tool: 'adjust', sheet: 'presets', dock: 'presets' } },
 ];
 
-/** Which mobile tab the current UI state corresponds to. */
 export const activeMobileTab = (ui) => (ui.tool === 'adjust' ? ui.sheet ?? 'adjust' : ui.tool);
 
 function IconButton({ label, children, ...props }) {

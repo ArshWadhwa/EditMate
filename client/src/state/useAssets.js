@@ -1,12 +1,10 @@
+/**
+ * Hook managing user-imported assets like backdrop images and logos.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadImageFile, releaseImage } from '../lib/image.js';
 
-/**
- * Images placed into an edit (image layers, replacement backgrounds).
- *
- * The undoable document only stores asset ids; the bitmaps live here. Assets are never
- * dropped during a session, so undoing a deletion can always bring its image back.
- */
 export function useAssets() {
   const map = useRef(new Map());
   const [version, setVersion] = useState(0);

@@ -1,3 +1,7 @@
+/**
+ * Server entry point booting the Express HTTP server with graceful shutdown.
+ */
+
 import { createApp } from './app.js';
 import { config } from './config.js';
 import { connectDatabase, disconnectDatabase } from './db.js';

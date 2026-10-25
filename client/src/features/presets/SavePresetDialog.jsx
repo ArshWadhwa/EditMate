@@ -1,3 +1,7 @@
+/**
+ * Modal dialog for saving the current adjustments as a new preset.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { LoaderCircle, X } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
@@ -14,10 +18,6 @@ function paletteOf(thumbnail, adjustments) {
   return extractPalette(out, 5);
 }
 
-/**
- * `draft` is null when closed, otherwise { adjustments?, name?, swatch?, source? }.
- * Missing fields default to the current edit.
- */
 export function SavePresetDialog({ draft, onClose }) {
   const dialogRef = useRef(null);
   const inputRef = useRef(null);
@@ -35,7 +35,6 @@ export function SavePresetDialog({ draft, onClose }) {
       setName(draft.name ?? `My look ${saved.length + 1}`);
       setError('');
       dialog.showModal();
-      // React's autoFocus doesn't reach showModal(); focus and select the name explicitly.
       requestAnimationFrame(() => inputRef.current?.select());
     } else if (!draft && dialog.open) {
       dialog.close();

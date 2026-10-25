@@ -1,4 +1,6 @@
-/** Small presentational primitives shared across panels. */
+/**
+ * Primitive UI components including buttons, panels, tags, and keyboard badges.
+ */
 
 const cx = (...classes) => classes.filter(Boolean).join(' ');
 

@@ -1,3 +1,7 @@
+/**
+ * HTTP request controllers for preset CRUD operations.
+ */
+
 import * as presets from '../services/presets.service.js';
 
 export async function list(req, res) {

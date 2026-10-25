@@ -1,3 +1,7 @@
+/**
+ * Middleware ensuring database connectivity before executing queries.
+ */
+
 import { databaseState } from '../db.js';
 import { HttpError } from '../lib/httpError.js';
 

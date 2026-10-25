@@ -1,3 +1,7 @@
+/**
+ * Context provider managing preset fetching, creation, deletion, and local caching.
+ */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useApiStatus } from '../../lib/useApiStatus.js';
@@ -26,7 +30,6 @@ export function PresetsProvider({ children }) {
     };
   }, [status, toast]);
 
-  /** Resolves to the created preset; rejects with an ApiError the caller can show inline. */
   const savePreset = useCallback(async (preset) => {
     const created = await api.createPreset(preset);
     setSaved((list) => [created, ...list]);

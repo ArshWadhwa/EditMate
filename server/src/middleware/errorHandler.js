@@ -1,3 +1,7 @@
+/**
+ * Global Express error handling and 404 response middleware.
+ */
+
 import { ZodError } from 'zod';
 import { HttpError } from '../lib/httpError.js';
 
@@ -5,7 +9,6 @@ export function notFoundHandler(req, _res, next) {
   next(new HttpError(404, `No route for ${req.method} ${req.path}`));
 }
 
-// eslint-disable-next-line no-unused-vars
 export function errorHandler(err, _req, res, _next) {
   if (err instanceof ZodError) {
     return res.status(400).json({

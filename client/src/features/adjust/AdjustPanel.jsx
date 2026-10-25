@@ -1,3 +1,7 @@
+/**
+ * Side panel containing adjustment sliders, auto-tone buttons, and histogram.
+ */
+
 import { useCallback } from 'react';
 import { BookmarkPlus, Pipette, RotateCcw } from 'lucide-react';
 import { ADJUSTMENTS, ADJUSTMENT_GROUPS } from '@editmate/shared';
@@ -31,7 +35,6 @@ export function AdjustPanel({ onSavePreset }) {
 
   return (
     <Panel className="flex min-h-0 flex-col p-5">
-      {/* On phones the top bar already shows the file name. */}
       <header className="hidden items-start justify-between gap-3 lg:flex">
         <div className="min-w-0">
           <h2 className="truncate text-[19px] font-bold tracking-tight" title={image.name}>

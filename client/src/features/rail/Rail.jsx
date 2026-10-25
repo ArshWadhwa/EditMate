@@ -1,10 +1,13 @@
+/**
+ * Desktop side navigation rail for switching editing tools and viewing status.
+ */
+
 import { Bookmark, Crop, Eraser, ImageUp, Keyboard, Layers, Redo2, SlidersHorizontal, Sparkles, Undo2 } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { usePresets } from '../presets/PresetsProvider.jsx';
 import { API_STATUS_COPY } from '../../lib/useApiStatus.js';
 import { cx } from '../../components/ui.jsx';
 
-/** `active` marks the current tool; `selected` marks the open dock tab (quieter). */
 function RailButton({ label, shortcut, active, selected, children, ...props }) {
   return (
     <button

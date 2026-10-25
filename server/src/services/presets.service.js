@@ -1,3 +1,7 @@
+/**
+ * Business logic and database queries for adjustment presets.
+ */
+
 import mongoose from 'mongoose';
 import { Preset } from '../models/Preset.js';
 import { notFound } from '../lib/httpError.js';

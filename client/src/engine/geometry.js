@@ -1,7 +1,5 @@
 /**
- * Resolution-independent geometric transformation and crop pipeline.
- * Coordinates and crop rectangles are normalized to [0, 1] fractions
- * to ensure consistent rendering between viewport previews and full exports.
+ * Geometry calculations for crop, rotation, flip, and straightening.
  */
 
 export const defaultGeometry = () => ({
@@ -16,14 +14,6 @@ export const isDefaultGeometry = (g) =>
 
 export const totalRotation = (g) => g.quarterTurns * 90 + g.straighten;
 
-/**
- * Calculates the bounding box dimensions of a rectangle rotated by the given angle.
- *
- * @param {number} width - Original width
- * @param {number} height - Original height
- * @param {number} degrees - Rotation angle in degrees
- * @returns {{ width: number, height: number }} Bounding box dimensions
- */
 export function rotatedSize(width, height, degrees) {
   const rad = (degrees * Math.PI) / 180;
   const cos = Math.abs(Math.cos(rad));
@@ -34,15 +24,6 @@ export function rotatedSize(width, height, degrees) {
   };
 }
 
-/**
- * Computes the maximum inner crop rectangle to prevent transparent corners
- * when an image is straightened.
- *
- * @param {number} width
- * @param {number} height
- * @param {{ quarterTurns: number, straighten: number }} geometry
- * @returns {{ x: number, y: number, width: number, height: number }} Normalized crop rectangle
- */
 export function autoStraightenCrop(width, height, geometry) {
   const turned = geometry.quarterTurns % 2 ? { width: height, height: width } : { width, height };
   const rad = (Math.abs(geometry.straighten) * Math.PI) / 180;
@@ -56,29 +37,12 @@ export function autoStraightenCrop(width, height, geometry) {
   return { x: (1 - cw) / 2, y: (1 - ch) / 2, width: cw, height: ch };
 }
 
-/**
- * Resolves the effective crop rectangle, falling back to auto-straightening
- * or full bounds.
- *
- * @param {number} width
- * @param {number} height
- * @param {object} geometry
- * @returns {{ x: number, y: number, width: number, height: number }}
- */
 export function effectiveCrop(width, height, geometry) {
   if (geometry.crop) return geometry.crop;
   if (geometry.straighten) return autoStraightenCrop(width, height, geometry);
   return { x: 0, y: 0, width: 1, height: 1 };
 }
 
-/**
- * Calculates the output dimensions in pixels after applying rotation and crop.
- *
- * @param {number} width
- * @param {number} height
- * @param {object} geometry
- * @returns {{ width: number, height: number }} Output pixel dimensions
- */
 export function outputSize(width, height, geometry) {
   const box = rotatedSize(width, height, totalRotation(geometry));
   const crop = effectiveCrop(width, height, geometry);
@@ -88,14 +52,6 @@ export function outputSize(width, height, geometry) {
   };
 }
 
-/**
- * Renders source image onto a canvas with all geometric transformations applied.
- *
- * @param {CanvasImageSource & { width: number, height: number }} source
- * @param {object} geometry
- * @param {number} [maxSize=Infinity] - Optional max edge constraint
- * @returns {HTMLCanvasElement}
- */
 export function renderGeometry(source, geometry, maxSize = Infinity) {
   const { width, height } = source;
   const degrees = totalRotation(geometry);
@@ -127,13 +83,6 @@ export function renderGeometry(source, geometry, maxSize = Infinity) {
   return canvas;
 }
 
-/**
- * Proportionally downscales a canvas so its largest dimension does not exceed `maxSize`.
- *
- * @param {HTMLCanvasElement} canvas
- * @param {number} maxSize
- * @returns {HTMLCanvasElement}
- */
 export function downscale(canvas, maxSize) {
   const scale = Math.min(1, maxSize / Math.max(canvas.width, canvas.height));
   const out = document.createElement('canvas');
@@ -145,23 +94,9 @@ export function downscale(canvas, maxSize) {
   return out;
 }
 
-/**
- * Extracts raw RGBA pixel data from a canvas element.
- *
- * @param {HTMLCanvasElement} canvas
- * @returns {ImageData}
- */
 export const readPixels = (canvas) =>
   canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, canvas.width, canvas.height);
 
-/**
- * Computes the rotated frame coordinates and dimensions.
- *
- * @param {number} imageWidth
- * @param {number} imageHeight
- * @param {number} degrees
- * @returns {{ W: number, H: number, w: number, h: number, rad: number }}
- */
 export function createFrame(imageWidth, imageHeight, degrees) {
   const rad = (degrees * Math.PI) / 180;
   const cos = Math.abs(Math.cos(rad));
@@ -175,13 +110,6 @@ export function createFrame(imageWidth, imageHeight, degrees) {
   };
 }
 
-/**
- * Constrains a rectangle to fit within target aspect ratio centered in bounds.
- *
- * @param {{ x: number, y: number, width: number, height: number }} rect
- * @param {number|null} aspect
- * @returns {{ x: number, y: number, width: number, height: number }}
- */
 export function fitAspect(rect, aspect) {
   if (!aspect) return rect;
   let width = rect.width;
@@ -198,13 +126,6 @@ export function fitAspect(rect, aspect) {
   };
 }
 
-/**
- * Computes the largest centered rectangle matching the given aspect ratio in a frame.
- *
- * @param {{ W: number, H: number, w: number, h: number }} frame
- * @param {number} [aspect]
- * @returns {{ x: number, y: number, width: number, height: number }}
- */
 export function largestRect(frame, aspect) {
   return fitAspect({ x: 0, y: 0, width: frame.W, height: frame.H }, aspect ?? frame.w / frame.h);
 }

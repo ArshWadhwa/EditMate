@@ -1,3 +1,7 @@
+/**
+ * Mongoose schema and model definition for saved adjustment presets.
+ */
+
 import mongoose from 'mongoose';
 import { ADJUSTMENTS } from '@editmate/shared';
 
@@ -27,7 +31,6 @@ const presetSchema = new mongoose.Schema(
   },
 );
 
-// Names are how people find presets, so keep them unique per owner (case-insensitive).
 presetSchema.index(
   { clientId: 1, name: 1 },
   { unique: true, collation: { locale: 'en', strength: 2 } },

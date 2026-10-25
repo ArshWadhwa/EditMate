@@ -1,7 +1,7 @@
 /**
- * Single source of truth for every adjustment EditMate understands.
- * The client renders sliders from this list; the server validates presets against it.
+ * Image adjustment definitions, validation limits, defaults, and normalization helpers.
  */
+
 export const ADJUSTMENTS = [
   { key: 'brightness', label: 'Brightness', group: 'light', min: -100, max: 100 },
   { key: 'contrast', label: 'Contrast', group: 'light', min: -100, max: 100 },
@@ -39,7 +39,6 @@ export function clampAdjustment(key, value) {
   return Math.round(Math.min(max, Math.max(min, value)));
 }
 
-/** Fills missing keys with defaults, drops unknown keys and clamps everything into range. */
 export function normalizeAdjustments(input = {}) {
   const out = defaultAdjustments();
   for (const key of ADJUSTMENT_KEYS) {

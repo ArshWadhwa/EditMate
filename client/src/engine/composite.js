@@ -1,19 +1,11 @@
-import { drawLayer, needsMask } from './layers.js';
-
 /**
- * 2D Canvas compositing engine for backgrounds, cutout masks, and overlay layers.
+ * Canvas compositing engine for backgrounds, cutout masks, and overlay layers.
  */
+
+import { drawLayer, needsMask } from './layers.js';
 
 const scratch = new Map();
 
-/**
- * Retrieves or creates a pooled scratch canvas matching target dimensions.
- *
- * @param {string} key
- * @param {number} width
- * @param {number} height
- * @returns {HTMLCanvasElement}
- */
 function scratchCanvas(key, width, height) {
   let canvas = scratch.get(key);
   if (!canvas) {
@@ -27,14 +19,6 @@ function scratchCanvas(key, width, height) {
   return canvas;
 }
 
-/**
- * Renders an image to fill the canvas maintaining aspect ratio (object-fit: cover).
- *
- * @param {CanvasRenderingContext2D} ctx
- * @param {CanvasImageSource & { width: number, height: number }} image
- * @param {number} W
- * @param {number} H
- */
 function drawCover(ctx, image, W, H) {
   const scale = Math.max(W / image.width, H / image.height);
   const w = image.width * scale;
@@ -42,15 +26,6 @@ function drawCover(ctx, image, W, H) {
   ctx.drawImage(image, (W - w) / 2, (H - h) / 2, w, h);
 }
 
-/**
- * Blurs an image onto the canvas using hardware-accelerated context filter.
- *
- * @param {CanvasRenderingContext2D} ctx
- * @param {CanvasImageSource} image
- * @param {number} W
- * @param {number} H
- * @param {number} amount - Blur radius percentage
- */
 function drawBlurred(ctx, image, W, H, amount) {
   const radius = (amount / 100) * 0.04 * Math.max(W, H);
   const bleed = radius * 2;
@@ -60,18 +35,6 @@ function drawBlurred(ctx, image, W, H, amount) {
   ctx.restore();
 }
 
-/**
- * Composites the final scene (backdrop -> subject cutout mask -> layer stack).
- *
- * @param {HTMLCanvasElement} target - Destination canvas element
- * @param {object} scene
- * @param {CanvasImageSource & { width: number, height: number }} scene.photo
- * @param {CanvasImageSource | null} scene.mask
- * @param {{ mode: string, color?: string, assetId?: string, blur?: number }} scene.background
- * @param {Array<object>} scene.layers
- * @param {Map<string, { bitmap: CanvasImageSource }>} scene.assets
- * @returns {HTMLCanvasElement}
- */
 export function compose(target, { photo, mask, background, layers, assets }) {
   const W = photo.width;
   const H = photo.height;
@@ -110,18 +73,6 @@ export function compose(target, { photo, mask, background, layers, assets }) {
   return target;
 }
 
-/**
- * Checks whether the document contains any layers or non-default background.
- *
- * @param {object} doc
- * @returns {boolean}
- */
 export const hasComposition = (doc) => doc.layers.length > 0 || needsMask(doc.background);
 
-/**
- * Checks whether the document background requires alpha channel preservation.
- *
- * @param {object} doc
- * @returns {boolean}
- */
 export const needsAlpha = (doc) => doc.background.mode === 'transparent';

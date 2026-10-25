@@ -1,3 +1,7 @@
+/**
+ * HUD overlay displaying photo metadata, zoom levels, and quick actions.
+ */
+
 import { useState } from 'react';
 import { useEditor, useFrame } from '../../state/EditorProvider.jsx';
 import { outputSize } from '../../engine/geometry.js';
@@ -22,7 +26,6 @@ export function HudStrip({ zoom, onZoom, displayScale }) {
   const [channels, setChannels] = useState(['l']);
 
   const size = outputSize(image.width, image.height, geometry);
-  // Relative exposure value (EV) delta computed from measured brightness.
   const ev = stats && sourceStats ? Math.log2(Math.max(stats.brightness, 1e-3) / Math.max(sourceStats.brightness, 1e-3)) : 0;
   const clip = clipping(histogram);
 

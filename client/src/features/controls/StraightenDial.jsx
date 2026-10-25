@@ -1,3 +1,7 @@
+/**
+ * Dial control for fine-angle photo straightening and rotation.
+ */
+
 import { useRef } from 'react';
 import { FlipHorizontal2, RotateCcwSquare } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
@@ -7,7 +11,6 @@ import { Panel, cx } from '../../components/ui.jsx';
 import { useGeometryActions } from '../crop/CropProvider.jsx';
 
 const LIMIT = 45;
-/** The needle turns twice as far as the image so ±45° spans the left and right quarters. */
 const DIAL_RATIO = 2;
 
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -58,7 +61,7 @@ export function StraightenDial() {
     let delta = pointerAngle(e) - drag.current.start;
     delta = ((delta + 540) % 360) - 180;
     let next = round1(clampAngle(drag.current.value + delta / DIAL_RATIO));
-    if (Math.abs(next) < 0.4) next = 0; // gentle snap to level
+    if (Math.abs(next) < 0.4) next = 0; 
     previewStraighten(next);
   };
 

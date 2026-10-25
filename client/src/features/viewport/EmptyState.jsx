@@ -1,3 +1,7 @@
+/**
+ * Initial placeholder view prompting users to open or drop a photo.
+ */
+
 import { ImageUp, ShieldCheck } from 'lucide-react';
 import { Kbd } from '../../components/ui.jsx';
 

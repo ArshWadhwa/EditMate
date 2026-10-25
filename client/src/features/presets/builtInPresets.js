@@ -1,3 +1,7 @@
+/**
+ * Definitions and adjustment values for default built-in presets.
+ */
+
 import { normalizeAdjustments } from '@editmate/shared';
 
 const preset = (id, name, adjustments) => ({ id, name, builtIn: true, adjustments: normalizeAdjustments(adjustments) });

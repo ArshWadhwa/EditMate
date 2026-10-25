@@ -1,11 +1,13 @@
+/**
+ * HTTP client for communication with the presets backend API.
+ */
+
 const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 const CLIENT_ID_KEY = 'editmate.clientId';
 
-/** Anonymous per-browser id that scopes saved presets until EditMate has accounts. */
 function clientId() {
   let id = localStorage.getItem(CLIENT_ID_KEY);
   if (!id) {
-    // getRandomValues works on plain-HTTP LAN addresses too (randomUUID needs a secure context).
     id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
     localStorage.setItem(CLIENT_ID_KEY, id);
   }

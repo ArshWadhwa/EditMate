@@ -1,3 +1,7 @@
+/**
+ * Utilities for image file loading, canvas conversions, and format detection.
+ */
+
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/bmp'];
 export const ACCEPT_ATTR = ACCEPTED_TYPES.join(',');
 
@@ -5,9 +9,6 @@ const MAX_PIXELS = 50_000_000;
 
 export class ImageLoadError extends Error {}
 
-/**
- * Decodes a user file into an ImageBitmap (EXIF orientation applied) plus the metadata the UI shows.
- */
 export async function loadImageFile(file) {
   if (!file?.type.startsWith('image/')) throw new ImageLoadError(`“${file?.name ?? 'File'}” isn’t an image`);
 

@@ -1,13 +1,12 @@
+/**
+ * Zustand store managing document state, undo/redo history, and UI tool selection.
+ */
+
 import { create } from 'zustand';
 import { defaultAdjustments } from '@editmate/shared';
 import { defaultGeometry } from '../engine/geometry.js';
 import { defaultBackground } from '../engine/layers.js';
 
-/**
- * Initializes a new document structure with default parameters.
- *
- * @returns {object} Document state
- */
 export const emptyDocument = () => ({
   adjustments: defaultAdjustments(),
   geometry: defaultGeometry(),
@@ -15,13 +14,6 @@ export const emptyDocument = () => ({
   layers: [],
 });
 
-/**
- * Immutably merges partial document patches into an existing document object.
- *
- * @param {object} doc - Existing document state
- * @param {object} patch - Partial document updates
- * @returns {object} Updated document
- */
 export function mergeDocument(doc, patch) {
   return {
     adjustments: patch.adjustments ? { ...doc.adjustments, ...patch.adjustments } : doc.adjustments,
@@ -31,24 +23,15 @@ export function mergeDocument(doc, patch) {
   };
 }
 
-/**
- * Global Zustand store managing document state, live previews, and gesture undo/redo history.
- */
 export const useDocStore = create((set, get) => ({
   doc: emptyDocument(),
   committed: emptyDocument(),
   past: [],
   future: [],
 
-  /**
-   * Applies uncommitted preview updates during an active slider/pointer drag gesture.
-   */
   preview: (patch) =>
     set((s) => ({ doc: mergeDocument(s.doc, patch) })),
 
-  /**
-   * Commits the current gesture state into the undo history stack.
-   */
   commit: () =>
     set((s) => {
       if (JSON.stringify(s.doc) === JSON.stringify(s.committed)) return s;
@@ -59,9 +42,6 @@ export const useDocStore = create((set, get) => ({
       };
     }),
 
-  /**
-   * Atomically commits a discrete action (e.g. presets, reset buttons).
-   */
   apply: (patch) => {
     const nextDoc = mergeDocument(get().doc, patch);
     set((s) => ({
@@ -72,9 +52,6 @@ export const useDocStore = create((set, get) => ({
     }));
   },
 
-  /**
-   * Reverts the document to the previous committed state in history.
-   */
   undo: () =>
     set((s) => {
       if (!s.past.length) return s;
@@ -87,9 +64,6 @@ export const useDocStore = create((set, get) => ({
       };
     }),
 
-  /**
-   * Re-applies the next state from the redo stack.
-   */
   redo: () =>
     set((s) => {
       if (!s.future.length) return s;
@@ -102,9 +76,6 @@ export const useDocStore = create((set, get) => ({
       };
     }),
 
-  /**
-   * Resets document state and purges undo/redo history stacks.
-   */
   reset: (doc = emptyDocument()) =>
     set({ doc, committed: doc, past: [], future: [] }),
 }));

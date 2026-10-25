@@ -1,3 +1,7 @@
+/**
+ * Panel for background cutout removal and replacement modes.
+ */
+
 import { useRef } from 'react';
 import { CircleAlert, Droplets, Image as ImageIcon, LoaderCircle, PaintBucket, ScanFace, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
@@ -28,7 +32,6 @@ export function BackgroundPanel() {
   const ready = subject.status === 'ready';
   const working = subject.status === 'working';
 
-  /** Picking a mode detects the subject first if needed, then switches. */
   const chooseMode = async (mode) => {
     if (mode === 'image' && !background.assetId) {
       fileRef.current?.click();
@@ -160,7 +163,7 @@ export function BackgroundPanel() {
 
       <p className="mt-auto flex items-start gap-2 pt-6 text-[11px] leading-relaxed text-white/35">
         <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-ok" />
-        Runs on your device. The first use downloads the AI model once (about 40–80 MB).
+        Runs on your device with hardware acceleration (BiRefNet WebGPU). The AI model downloads once and is cached locally.
         {background.mode === 'transparent' && ' Transparent backgrounds export as PNG.'}
       </p>
     </Panel>

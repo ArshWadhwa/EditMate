@@ -1,3 +1,7 @@
+/**
+ * Interactive canvas stage overlay for dragging and resizing the crop rectangle.
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Cropper from 'cropperjs';
 import { useEditor } from '../../state/EditorProvider.jsx';
@@ -5,10 +9,8 @@ import { renderGeometry } from '../../engine/geometry.js';
 import { applyAdjustments } from '../../engine/pipeline.js';
 import { useCrop } from './CropProvider.jsx';
 
-/** Longest side of the image shown behind the crop box. */
 const DISPLAY_MAX = 1400;
 
-/** The whole rotated image (uncropped, unflipped) with the current adjustments, as a canvas. */
 function useCropBackdrop() {
   const { image, geometry, adjustments } = useEditor();
   const canvas = useMemo(() => {
@@ -29,14 +31,12 @@ export function CropStage() {
   const cropperRef = useRef(null);
   const [imageSrc, setImageSrc] = useState('');
 
-  // Generate data URL from backdrop canvas for Cropper
   useEffect(() => {
     if (backdrop) {
       setImageSrc(backdrop.toDataURL());
     }
   }, [backdrop]);
 
-  // Initialize Cropper.js instance
   useEffect(() => {
     const imgEl = imageRef.current;
     if (!imgEl || !imageSrc || !backdrop || !frame) return;
@@ -85,14 +85,12 @@ export function CropStage() {
     };
   }, [imageSrc, backdrop, frame]);
 
-  // Update aspect ratio dynamically when option changes in CropPanel
   useEffect(() => {
     if (cropperRef.current) {
       cropperRef.current.setAspectRatio(aspect || NaN);
     }
   }, [aspect]);
 
-  // Keyboard navigation
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key === 'Enter') {
@@ -130,7 +128,6 @@ export function CropStage() {
         Drag the box or its handles · arrows to nudge · ↵ to apply · Esc to cancel
       </p>
 
-      {/* Mobile action bar */}
       <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2 lg:hidden">
         <button type="button" onClick={cancelCrop} className="glass hairline h-10 rounded-xl px-4 text-[13px] font-bold">
           Cancel

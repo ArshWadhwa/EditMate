@@ -1,3 +1,7 @@
+/**
+ * Dropdown menu and modal for exporting images in JPEG, PNG, WebP, or PDF.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, CircleAlert, Download, LoaderCircle } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
@@ -7,7 +11,6 @@ import { outputSize } from '../../engine/geometry.js';
 import { RangeField } from '../../components/fields.jsx';
 import { cx } from '../../components/ui.jsx';
 
-/** Formats this browser can actually encode (AVIF and WebP vary by browser). */
 function useSupportedFormats() {
   const [supported, setSupported] = useState(() => new Set(['jpeg', 'png', 'pdf']));
   useEffect(() => {
@@ -22,7 +25,6 @@ function useSupportedFormats() {
   return supported;
 }
 
-/** Export button with a format/quality/size menu. The main button repeats the last settings. */
 export function ExportMenu() {
   const { image, geometry, background, layers, exportImage, exporting, exportSettings, exportFormat, setExportSettings } = useEditor();
   const [open, setOpen] = useState(false);

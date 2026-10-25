@@ -1,11 +1,11 @@
+/**
+ * Hook providing layer mutation actions like add, remove, reorder, and duplicate.
+ */
+
 import { useCallback, useMemo } from 'react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { createImageLayer, createShapeLayer, createTextLayer, duplicateLayer } from '../../engine/layers.js';
 
-/**
- * Every layer change goes through the undoable document. Use `preview` while a gesture is
- * running (dragging, typing) and `commit` when it ends; everything else applies immediately.
- */
 export function useLayerActions() {
   const { layers, ui, setUi, preview, commit, apply, assets, base } = useEditor();
   const selected = layers.find((l) => l.id === ui.selectedLayerId) ?? null;
@@ -17,7 +17,6 @@ export function useLayerActions() {
   const actions = useMemo(
     () => ({
       select,
-      /** Live update during a gesture (no undo step until `commit`). */
       previewUpdate: (id, patch) => preview({ layers: replace(id, patch) }),
       commit,
       update: (id, patch) => apply({ layers: replace(id, patch) }),
@@ -45,7 +44,6 @@ export function useLayerActions() {
         apply({ layers: [...layers.slice(0, index + 1), copy, ...layers.slice(index + 1)] });
         setUi({ selectedLayerId: copy.id });
       },
-      /** +1 moves towards the front (drawn later), −1 towards the back. */
       reorder: (id, direction) => {
         const index = layers.findIndex((l) => l.id === id);
         const target = index + direction;
@@ -54,7 +52,6 @@ export function useLayerActions() {
         [next[index], next[target]] = [next[target], next[index]];
         apply({ layers: next });
       },
-      /** Nudge by a fraction of the output size. */
       nudge: (id, dx, dy) => {
         const layer = layers.find((l) => l.id === id);
         if (layer) apply({ layers: replace(id, { x: layer.x + dx, y: layer.y + dy }) });

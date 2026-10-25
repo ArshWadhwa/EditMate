@@ -1,6 +1,9 @@
+/**
+ * Hook evaluating CSS media queries for responsive layouts.
+ */
+
 import { useSyncExternalStore } from 'react';
 
-/** Subscribes to a CSS media query, e.g. useMediaQuery('(min-width: 1024px)'). */
 export function useMediaQuery(query) {
   return useSyncExternalStore(
     (onChange) => {
@@ -13,8 +16,6 @@ export function useMediaQuery(query) {
   );
 }
 
-/** Desktop layout (side rail, panel grid) from this width; below it the mobile app layout. */
 export const DESKTOP_QUERY = '(min-width: 1024px)';
 
-/** Touch-first devices get larger hit targets. */
 export const COARSE_POINTER_QUERY = '(pointer: coarse)';

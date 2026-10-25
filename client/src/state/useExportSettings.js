@@ -1,7 +1,10 @@
+/**
+ * State hook managing format, quality, and scaling options for image export.
+ */
+
 import { useCallback, useState } from 'react';
 
 const KEY = 'editmate.export';
-/** `format: null` means "same as the original photo". */
 const DEFAULTS = { format: null, quality: 0.92, size: 'full' };
 
 function read() {
@@ -12,7 +15,6 @@ function read() {
   }
 }
 
-/** Last-used export options, remembered per browser so ⌘E repeats the previous export. */
 export function useExportSettings() {
   const [settings, setSettings] = useState(read);
 
@@ -21,9 +23,7 @@ export function useExportSettings() {
       const next = { ...current, ...patch };
       try {
         localStorage.setItem(KEY, JSON.stringify(next));
-      } catch {
-        // Storage can be unavailable (private mode); settings still apply for this session.
-      }
+      } catch {}
       return next;
     });
   }, []);

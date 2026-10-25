@@ -1,3 +1,7 @@
+/**
+ * Custom error class representing HTTP errors with status codes.
+ */
+
 export class HttpError extends Error {
   constructor(status, message, details) {
     super(message);

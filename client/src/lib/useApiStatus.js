@@ -1,11 +1,12 @@
+/**
+ * Hook monitoring backend API health and connectivity status.
+ */
+
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 
 const POLL_MS = 30_000;
 
-/**
- * 'checking' | 'online' (API + database) | 'no-database' | 'offline'
- */
 export function useApiStatus() {
   const [status, setStatus] = useState('checking');
 

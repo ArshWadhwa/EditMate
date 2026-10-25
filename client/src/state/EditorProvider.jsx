@@ -1,3 +1,7 @@
+/**
+ * React context provider coordinating photo state, adjustments, undo history, and rendering.
+ */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { defaultAdjustments, isNeutral } from '@editmate/shared';
 import { defaultGeometry, downscale, renderGeometry } from '../engine/geometry.js';

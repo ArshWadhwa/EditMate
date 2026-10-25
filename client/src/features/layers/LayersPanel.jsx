@@ -1,3 +1,7 @@
+/**
+ * Panel for adding, reordering, styling, and managing document layers.
+ */
+
 import { useRef } from 'react';
 import {
   AlignCenter,
@@ -58,7 +62,6 @@ export function LayersPanel() {
     }
   };
 
-  // Live while dragging/typing; one undo step when the control is released.
   const live = (patch) => previewUpdate(selected.id, patch);
   const set = (patch) => update(selected.id, patch);
 

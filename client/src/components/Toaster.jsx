@@ -1,3 +1,7 @@
+/**
+ * Toast notification provider and toast display component.
+ */
+
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { CircleAlert, CircleCheck, Info } from 'lucide-react';
 

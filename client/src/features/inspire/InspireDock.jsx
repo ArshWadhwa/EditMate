@@ -1,3 +1,7 @@
+/**
+ * Dock tab displaying recipe suggestions extracted from an inspiration photo.
+ */
+
 import { useRef, useState } from 'react';
 import { ImagePlus, LoaderCircle, RefreshCw, X } from 'lucide-react';
 import { getAdjustment } from '@editmate/shared';
@@ -28,8 +32,6 @@ function ReferenceDrop({ onFile, disabled }) {
       type="button"
       disabled={disabled}
       onClick={() => inputRef.current?.click()}
-      // The zone handles its own drags; stopping propagation keeps the app-wide
-      // "open a new photo" overlay from counting (or showing for) these events.
       onDragEnter={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -163,7 +165,6 @@ export function InspireDock({ onSavePreset }) {
       <div
         className={cx(
           'w-full shrink-0 flex-col justify-center gap-2 md:w-[170px] lg:w-[150px] xl:w-[170px]',
-          // The how-it-works steps are optional; on small laptops give the readouts that room.
           recipe && !analyzing ? 'flex' : 'flex lg:hidden xl:flex',
         )}
       >

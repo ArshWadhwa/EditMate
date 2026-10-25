@@ -1,3 +1,7 @@
+/**
+ * Root application component managing responsive layout, global shortcuts, and file drop.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ImageUp, ShieldCheck, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { ToastProvider } from './components/Toaster.jsx';
@@ -57,7 +61,6 @@ function Editor() {
   const chooseFile = useCallback(() => fileInput.current?.click(), []);
   const savePreset = useCallback((draft = {}) => setPresetDraft(draft), []);
 
-  // Global keyboard shortcuts
   useHotkeys('mod+o', (e) => { e.preventDefault(); chooseFile(); });
   useHotkeys('mod+z', (e) => { e.preventDefault(); if (image) editor.undo(); });
   useHotkeys('mod+shift+z, mod+y', (e) => { e.preventDefault(); if (image) editor.redo(); });
@@ -65,7 +68,6 @@ function Editor() {
   useHotkeys('mod+d', (e) => { e.preventDefault(); if (image && layerActions.selected) layerActions.duplicate(layerActions.selected.id); });
   useHotkeys('shift+/', () => setShortcutsOpen(true));
 
-  // Tool shortcuts
   useHotkeys('c', () => image && setUi((u) => ({ compare: !u.compare })));
   useHotkeys('g', () => image && setUi((u) => ({ grid: !u.grid })));
   useHotkeys('r', () => image && setUi((u) => ({ tool: u.tool === 'crop' ? 'adjust' : 'crop' })));
@@ -74,11 +76,9 @@ function Editor() {
   useHotkeys('l', () => image && setUi({ tool: 'layers' }));
   useHotkeys('t', () => image && layerActions.addText());
 
-  // Show original (hold backslash)
   useHotkeys('backslash', () => image && setUi({ showOriginal: true }), { keydown: true });
   useHotkeys('backslash', () => image && setUi({ showOriginal: false }), { keyup: true });
 
-  // Layer keys
   useHotkeys('backspace, delete', () => {
     if (image && layerActions.selected && ui.tool !== 'crop') layerActions.remove(layerActions.selected.id);
   });
@@ -87,13 +87,11 @@ function Editor() {
     else if (layerActions.selected) layerActions.select(null);
   });
 
-  // Slider navigation
   useHotkeys('up', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.move(-1); } });
   useHotkeys('down', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.move(1); } });
   useHotkeys('left', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.nudge(e.shiftKey ? -10 : -1); } });
   useHotkeys('right', (e) => { if (image && ui.tool === 'adjust') { e.preventDefault(); focus.nudge(e.shiftKey ? 10 : 1); } });
 
-  // Safety net: any drop or cancelled drag anywhere ends the overlay, even if a child handled it.
   useEffect(() => {
     const reset = () => {
       dragDepth.current = 0;
@@ -166,7 +164,6 @@ function Editor() {
   );
 }
 
-/** ≥1024 px: side rail, viewport + tool panel on top, dock + dial below. */
 function DesktopLayout({ onOpenFile, onShowShortcuts, onSavePreset }) {
   const { image, ui } = useEditor();
   return (
@@ -184,10 +181,6 @@ function DesktopLayout({ onOpenFile, onShowShortcuts, onSavePreset }) {
   );
 }
 
-/**
- * <1024 px: an app-style layout that fits the screen without page scrolling.
- * Top bar, the photo filling the free space, a scrollable sheet for the active tool, tab bar.
- */
 function MobileLayout({ onOpenFile, onSavePreset }) {
   const { image, ui } = useEditor();
   const tab = activeMobileTab(ui);
@@ -214,7 +207,6 @@ function MobileLayout({ onOpenFile, onSavePreset }) {
 }
 
 function MobileSheet({ tab, onSavePreset }) {
-  // Panels are cards; stretch them to the sheet so short ones don't float.
   const fill = 'flex min-h-full flex-col [&>section]:flex-1';
   if (tab === 'crop') {
     return (

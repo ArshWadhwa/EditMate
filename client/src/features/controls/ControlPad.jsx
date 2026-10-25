@@ -1,3 +1,7 @@
+/**
+ * Circular rotary control pad for fine adjustment tweaking.
+ */
+
 import { useEffect, useRef } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { ADJUSTMENTS, clampAdjustment, getAdjustment } from '@editmate/shared';
@@ -6,7 +10,6 @@ import { signed } from '../../lib/format.js';
 import { cx } from '../../components/ui.jsx';
 import { useAutoActions } from '../adjust/AdjustPanel.jsx';
 
-/** Calls `fn` immediately, then repeats with acceleration while held; `onEnd` runs on release. */
 function useHoldRepeat() {
   const timer = useRef(null);
   const stop = () => clearTimeout(timer.current);
@@ -89,7 +92,6 @@ export function ControlPad({ disabled }) {
           <ChevronRight className="size-4" />
         </button>
 
-        {/* Label and value both live inside the centre disc so nothing is hidden behind it. */}
         <div className="absolute inset-[34px] flex flex-col items-center justify-center gap-0.5 rounded-full bg-ink-900 px-2 shadow-inner">
           <span className="max-w-full truncate text-[9px] font-semibold tracking-wide text-white/45">{focused.label}</span>
           <span className={cx('num text-[15px] leading-none font-medium', value ? 'text-accent' : 'text-white/60')} aria-live="polite">

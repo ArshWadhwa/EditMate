@@ -1,3 +1,7 @@
+/**
+ * MongoDB connection manager and connection state tracker.
+ */
+
 import mongoose from 'mongoose';
 
 mongoose.set('strictQuery', true);
@@ -10,7 +14,6 @@ export async function disconnectDatabase() {
   await mongoose.disconnect();
 }
 
-/** 'connected' | 'connecting' | 'disconnected' */
 export function databaseState() {
   switch (mongoose.connection.readyState) {
     case 1:

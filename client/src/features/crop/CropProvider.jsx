@@ -1,3 +1,7 @@
+/**
+ * Context provider managing interactive crop geometry and transform state.
+ */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import {
@@ -11,7 +15,6 @@ import {
   totalRotation,
 } from '../../engine/geometry.js';
 
-/** `ratio` is [w, h] in landscape terms; `swap` flips it to portrait. */
 export const ASPECTS = [
   { key: 'free', label: 'Free' },
   { key: 'original', label: 'Original' },
@@ -26,7 +29,6 @@ const clampRatioPart = (v) => Math.min(100, Math.max(1, Math.round(Number(v) || 
 
 const CropContext = createContext(null);
 
-/** Holds the in-progress crop while the crop tool is open; nothing is committed until Apply. */
 export function CropProvider({ children }) {
   const { image, geometry, ui, setUi, apply } = useEditor();
   const [aspectKey, setAspectKey] = useState('free');
@@ -37,7 +39,6 @@ export function CropProvider({ children }) {
   const rotation = image ? totalRotation(geometry) : 0;
   const frame = useMemo(() => (image ? createFrame(image.width, image.height, rotation) : null), [image, rotation]);
 
-  /** Ratio parts as displayed, e.g. [4, 5] or [16, 9]; null when unconstrained. */
   const ratio = useMemo(() => {
     if (!frame || aspectKey === 'free') return null;
     if (aspectKey === 'original') {
@@ -45,14 +46,12 @@ export function CropProvider({ children }) {
       return portrait ? [turned[1], turned[0]] : turned;
     }
     const base = aspectKey === 'custom' ? [custom.w, custom.h] : ASPECTS.find((a) => a.key === aspectKey).ratio;
-    // Presets are stored landscape-first; 4:5 reads naturally as portrait, so it starts swapped.
     const startsPortrait = aspectKey === '4:5';
     return portrait !== startsPortrait ? [base[1], base[0]] : base;
   }, [frame, aspectKey, portrait, custom, image, geometry.quarterTurns]);
 
   const aspect = ratio ? ratio[0] / ratio[1] : null;
 
-  // Start from the committed (or auto-straighten) crop whenever the tool opens or the rotation changes.
   useEffect(() => {
     if (ui.tool !== 'crop' || !frame) {
       setRect(null);
@@ -60,11 +59,8 @@ export function CropProvider({ children }) {
     }
     const start = fromFractions(frame, effectiveCrop(image.width, image.height, geometry));
     setRect(aspect ? fitAspect(start, aspect) : start);
-    // geometry.crop is intentionally excluded: the draft owns the crop while the tool is open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ui.tool, frame]);
 
-  // Re-shape the box when the ratio changes: shrink to fit, or use the largest fit if that's tiny.
   useEffect(() => {
     if (!aspect || !frame) return;
     setRect((current) => {
@@ -124,14 +120,12 @@ export function useCrop() {
   return ctx;
 }
 
-/** Rotation/flip helpers shared by the crop panel and the straighten dial. */
 export function useGeometryActions() {
   const { geometry, preview, commit, apply } = useEditor();
   return {
     rotateLeft: () => apply({ geometry: { quarterTurns: (geometry.quarterTurns + 3) % 4, crop: null } }),
     rotateRight: () => apply({ geometry: { quarterTurns: (geometry.quarterTurns + 1) % 4, crop: null } }),
     flip: () => apply({ geometry: { flipH: !geometry.flipH } }),
-    // Straightening invalidates a manual crop; the auto crop keeps the corners filled.
     previewStraighten: (straighten) => preview({ geometry: { straighten, crop: null } }),
     commitStraighten: commit,
     setStraighten: (straighten) => apply({ geometry: { straighten, crop: null } }),

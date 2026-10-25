@@ -1,3 +1,7 @@
+/**
+ * Bottom dock providing quick access to tools, presets, and history.
+ */
+
 import { Bookmark, Sparkles } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { Panel, Segmented } from '../../components/ui.jsx';

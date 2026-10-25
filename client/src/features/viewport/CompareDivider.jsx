@@ -1,11 +1,11 @@
+/**
+ * Draggable before/after comparison split view divider.
+ */
+
 import { ChevronsLeftRight } from 'lucide-react';
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
-/**
- * Draggable before/after divider. Rendered inside the (zoomed) image frame so `split`
- * stays in image coordinates; the handle is counter-scaled to keep a constant size.
- */
 export function CompareDivider({ split, zoom, onChange }) {
   const updateFromPointer = (e) => {
     const frame = e.currentTarget.parentElement.getBoundingClientRect();

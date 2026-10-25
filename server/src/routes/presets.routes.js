@@ -1,3 +1,7 @@
+/**
+ * Express router definitions for preset API endpoints.
+ */
+
 import { Router } from 'express';
 import * as controller from '../controllers/presets.controller.js';
 import { requireClientId } from '../middleware/clientId.js';

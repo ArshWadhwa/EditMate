@@ -1,3 +1,7 @@
+/**
+ * Zod validation schemas for preset creation and update requests.
+ */
+
 import { z } from 'zod';
 import { ADJUSTMENTS } from '@editmate/shared';
 

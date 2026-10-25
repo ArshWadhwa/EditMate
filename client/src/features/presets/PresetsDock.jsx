@@ -1,3 +1,7 @@
+/**
+ * Dock interface displaying built-in and user-saved presets.
+ */
+
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { BookmarkPlus, LoaderCircle, Trash2 } from 'lucide-react';
 import { ADJUSTMENT_KEYS } from '@editmate/shared';
@@ -9,7 +13,6 @@ import { usePresets } from './PresetsProvider.jsx';
 
 const sameAdjustments = (a, b) => ADJUSTMENT_KEYS.every((k) => a[k] === b[k]);
 
-/** Renders the preset onto the user's own photo so every card is a real preview. */
 const PresetThumb = memo(function PresetThumb({ source, adjustments }) {
   const ref = useRef(null);
   useEffect(() => {

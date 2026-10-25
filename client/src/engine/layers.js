@@ -1,9 +1,8 @@
-import { Ellipse, Line, Path, Rect, Shadow, Textbox } from 'fabric';
-
 /**
- * Layer schema, font registry, and canvas rendering engine.
- * Dimensions and positions are normalized as [0, 1] fractions of the output canvas.
+ * Layer model definitions, font management, and canvas rendering for overlays.
  */
+
+import { Ellipse, Line, Path, Rect, Shadow, Textbox } from 'fabric';
 
 export const FONTS = [
   { key: 'manrope', label: 'Manrope', family: 'Manrope', weights: [400, 600, 800] },
@@ -27,12 +26,6 @@ export const BACKGROUND_MODES = ['original', 'transparent', 'color', 'image', 'b
 
 export const defaultBackground = () => ({ mode: 'original', color: '#f4f1ea', assetId: null, blur: 40 });
 
-/**
- * Returns whether the background configuration requires the subject segmentation mask.
- *
- * @param {{ mode: string }} background
- * @returns {boolean}
- */
 export const needsMask = (background) => background.mode !== 'original';
 
 const fontOf = (key) => FONTS.find((f) => f.key === key) ?? FONTS[0];
@@ -52,11 +45,6 @@ const base = (type, name) => ({
   hidden: false,
 });
 
-/**
- * Creates a text layer with default typography and styling.
- *
- * @returns {object} Text layer definition
- */
 export function createTextLayer() {
   return {
     ...base('text', 'Text'),
@@ -76,12 +64,6 @@ export function createTextLayer() {
   };
 }
 
-/**
- * Creates a vector shape layer (rect, ellipse, line, or arrow).
- *
- * @param {'rect'|'ellipse'|'line'|'arrow'} [shape='rect']
- * @returns {object} Shape layer definition
- */
 export function createShapeLayer(shape = 'rect') {
   const linear = shape === 'line' || shape === 'arrow';
   return {
@@ -96,26 +78,11 @@ export function createShapeLayer(shape = 'rect') {
   };
 }
 
-/**
- * Creates an image layer with scaled proportional dimensions.
- *
- * @param {string} assetId
- * @param {string} name
- * @param {number} aspect - Asset natural aspect ratio (w / h)
- * @param {number} outputAspect - Canvas aspect ratio (W / H)
- * @returns {object} Image layer definition
- */
 export function createImageLayer(assetId, name, aspect, outputAspect) {
   const w = 0.4;
   return { ...base('image', name || 'Image'), assetId, aspect, w, h: (w * outputAspect) / aspect };
 }
 
-/**
- * Duplicates a layer with an offset position.
- *
- * @param {object} layer
- * @returns {object}
- */
 export function duplicateLayer(layer) {
   return {
     ...layer,
@@ -126,27 +93,12 @@ export function duplicateLayer(layer) {
   };
 }
 
-/**
- * Formats a CSS font string for a text layer at the given pixel size.
- *
- * @param {object} layer
- * @param {number} px
- * @returns {string}
- */
 export function fontString(layer, px) {
   const font = fontOf(layer.font);
   const weight = font.weights.includes(layer.weight) ? layer.weight : font.weights.at(-1);
   return `${layer.italic ? 'italic ' : ''}${weight} ${px}px "${font.family}", system-ui, sans-serif`;
 }
 
-/**
- * Instantiates a Fabric Textbox for word-wrapping and vector rendering.
- *
- * @param {object} layer
- * @param {number} W - Canvas pixel width
- * @param {number} H - Canvas pixel height
- * @returns {Textbox}
- */
 export function createTextObject(layer, W, H) {
   const font = fontOf(layer.font);
   const weight = font.weights.includes(layer.weight) ? layer.weight : font.weights.at(-1);
@@ -178,14 +130,6 @@ export function createTextObject(layer, W, H) {
   });
 }
 
-/**
- * Instantiates a Fabric Shape object for vector rendering.
- *
- * @param {object} layer
- * @param {number} W
- * @param {number} H
- * @returns {Rect|Ellipse|Line|Path}
- */
 export function createShapeObject(layer, W, H) {
   const w = layer.w * W;
   const h = layer.h * H;
@@ -246,41 +190,16 @@ export function createShapeObject(layer, W, H) {
   });
 }
 
-/**
- * Calculates wrapped layout dimensions for a text layer.
- *
- * @param {object} layer
- * @param {number} W
- * @param {number} H
- * @returns {{ px: number, height: number }}
- */
 export function layoutText(layer, W, H) {
   const tb = createTextObject(layer, W, H);
   return { px: layer.size * H, height: Math.max(layer.size * H * layer.lineHeight, tb.height) };
 }
 
-/**
- * Calculates the bounding box in output pixels.
- *
- * @param {object} layer
- * @param {number} W
- * @param {number} H
- * @returns {{ cx: number, cy: number, w: number, h: number, rotation: number }}
- */
 export function layerBox(layer, W, H) {
   const h = layer.type === 'text' ? layoutText(layer, W, H).height : layer.h * H;
   return { cx: layer.x * W, cy: layer.y * H, w: layer.w * W, h, rotation: layer.rotation };
 }
 
-/**
- * Renders a single layer onto a 2D canvas context.
- *
- * @param {CanvasRenderingContext2D} ctx
- * @param {object} layer
- * @param {number} W
- * @param {number} H
- * @param {Map<string, { bitmap: CanvasImageSource }>} assets
- */
 export function drawLayer(ctx, layer, W, H, assets) {
   if (layer.hidden) return;
 
@@ -302,12 +221,6 @@ export function drawLayer(ctx, layer, W, H, assets) {
   }
 }
 
-/**
- * Preloads all custom web fonts referenced by active text layers.
- *
- * @param {Array<object>} layers
- * @returns {Promise<any[]>}
- */
 export function loadLayerFonts(layers) {
   const wanted = new Set(layers.filter((l) => l.type === 'text').map((l) => fontString(l, 32)));
   return Promise.all([...wanted].map((f) => document.fonts.load(f).catch(() => null)));

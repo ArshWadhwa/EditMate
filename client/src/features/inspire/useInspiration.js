@@ -1,10 +1,13 @@
+/**
+ * Hook driving reference image measurement and iterative adjustment fitting.
+ */
+
 import { useCallback, useEffect, useState } from 'react';
 import { ADJUSTMENT_KEYS, clampAdjustment } from '@editmate/shared';
 import { classifyStyle, extractPalette, fitAdjustments, measure, measureNoise, suggestGrain } from '../../engine/analysis.js';
 import { downscale, readPixels } from '../../engine/geometry.js';
 import { loadImageFile } from '../../lib/image.js';
 
-/** Analysis resolution for texture (grain) estimates; both images are measured at this size. */
 const TEXTURE_SIZE = 512;
 
 function toCanvas(bitmap, maxSize) {
@@ -33,10 +36,6 @@ export function scaleRecipe(adjustments, strength) {
   return Object.fromEntries(ADJUSTMENT_KEYS.map((k) => [k, clampAdjustment(k, (adjustments[k] ?? 0) * strength)]));
 }
 
-/**
- * Keeps an inspiration reference and a recipe fitted to the *current* photo (re-fitted
- * whenever crop/rotation changes the photo).
- */
 export function useInspiration({ base, thumbnail, onError }) {
   const [reference, setReference] = useState(null);
   const [recipe, setRecipe] = useState(null);
@@ -70,7 +69,6 @@ export function useInspiration({ base, thumbnail, onError }) {
       return;
     }
     setAnalyzing(true);
-    // Yield a frame so the "Analyzing" state paints before the fit runs.
     const timer = setTimeout(() => {
       const source = readPixels(thumbnail);
       const texture = readPixels(downscale(base, TEXTURE_SIZE));
@@ -82,7 +80,6 @@ export function useInspiration({ base, thumbnail, onError }) {
     return () => clearTimeout(timer);
   }, [reference, thumbnail, base]);
 
-  // Revoke each reference's object URL once it is replaced or the editor unmounts.
   useEffect(() => () => reference && URL.revokeObjectURL(reference.url), [reference]);
 
   return { reference, recipe, analyzing, strength, setStrength, chooseReference, clearReference };

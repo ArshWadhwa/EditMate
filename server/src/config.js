@@ -1,3 +1,7 @@
+/**
+ * Environment configuration loader and validator for the API server.
+ */
+
 import 'dotenv/config';
 
 function list(value) {

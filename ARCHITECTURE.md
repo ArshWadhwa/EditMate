@@ -544,10 +544,9 @@ The full proposal (data model, API, security checklist, setup and tests) is in
 ### 17.1 Remove and replace the background
 
 - **Segmentation** lives in one adapter, [engine/segment.js](client/src/engine/segment.js). It runs
-  `@imgly/background-removal` (the ISNet model on ONNX Runtime Web) **in the browser, in a worker**.
-  The photo never leaves the device. The library, the 24 MB runtime and the model (fetched once from
-  img.ly's CDN, then cached) load lazily on the first click, so the main bundle stays small. The
-  adapter returns a full-size canvas whose **alpha channel is the subject**.
+  **BiRefNet** (Bilateral Reference Network) via WebGPU/ONNX Runtime Web with `@huggingface/transformers`
+  directly in the browser, with graceful fallback to quantized ISNet.
+  The photo never leaves the device. The adapter returns a full-size canvas whose **alpha channel is the subject**.
 - [useSubjectMask.js](client/src/state/useSubjectMask.js) runs it once per photo, with download and
   inference progress, and abandons stale runs when you open another photo.
 - The mask goes through the same `renderGeometry` as the photo, so crops, rotations and flips
@@ -881,7 +880,7 @@ Every choice was made against an alternative, and the trade-off is written down.
 | Styling | **Tailwind CSS 4** | Design tokens live in one `@theme` block ([index.css](client/src/index.css)), so the dark HUD palette stays consistent. There's no CSS file per component and no dead CSS in production. | CSS Modules / styled-components: more files and runtime cost, with less consistency. |
 | Rendering | **Canvas 2D + typed arrays in a Web Worker** | The plan asked for Canvas. Exact, deterministic pixel math that's easy to test in Node, works everywhere, fast enough (about 40 ms/2 MP with all effects). | **WebGL/WebGPU** would be 10–50× faster and is the natural next step for masks and 4K live preview, but shader code is harder to test and debug. The pure pipeline can be ported 1:1 later. CSS `filter`: can't do highlights/shadows/grain and doesn't match export. |
 | Cropping | **Custom handle-based crop** (`cropMath.js`) | Free-form plus locked ratios with one consistent interaction, and constraints that understand straightened images. | **react-easy-crop** (the plan's original choice) only supports a fixed-ratio box over a moving image, with no free-form crop. It was replaced when custom crop was added. |
-| Background removal | **@imgly/background-removal** (ISNet + ONNX Runtime Web) | Runs fully on-device in a worker, works on any subject (not just people), good edge quality. Loaded lazily. ⚠️ **AGPL-3.0**: fine for personal/open projects; shipping commercially needs img.ly's licence or a swap (one file: `engine/segment.js`). | remove.bg / cloud APIs (upload photos, per-image cost, API key), MediaPipe (people only), BiRefNet via transformers.js (MIT, but a ~100 MB+ model). |
+| Background removal | **BiRefNet** (`onnx-community/BiRefNet_lite-ONNX` via `@huggingface/transformers` WebGPU) + ISNet fallback | Hollywood-grade edge precision ($F_\beta^b = 0.875$), runs directly on-device on GPU, 100% MIT/Apache 2.0 open-source & free ($0). Fallback to quantized ISNet. | remove.bg / cloud APIs (upload photos, per-image cost, API key), MediaPipe (people only, blurry edges). |
 | PDF export | **Own 60-line writer** (`engine/pdf.js`) | One page, one embedded JPEG: no re-encoding and no dependency. | jsPDF (~350 kB for a feature we use 1% of). |
 | Icons | **lucide-react** | Clean consistent line icons, tree-shaken (only icons used are shipped). | Heroicons (smaller set), icon fonts (accessibility issues). |
 | Server | **Node.js + Express 5** | Same language as the client, and it shares the `shared/` schema with no codegen. Express 5 forwards async errors natively, so controllers have no try/catch boilerplate. Minimal, well understood, easy to deploy anywhere. | Fastify (faster, but the speed doesn't matter for a presets API), NestJS (heavy structure for 4 routes). |

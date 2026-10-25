@@ -1,3 +1,7 @@
+/**
+ * Formatting utilities for file sizes, dates, percentages, and dimensions.
+ */
+
 export const signed = (value) => (value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : '0');
 
 export const signedFixed = (value, digits = 1) => {

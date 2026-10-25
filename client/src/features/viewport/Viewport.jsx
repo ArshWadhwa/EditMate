@@ -1,3 +1,7 @@
+/**
+ * Main image canvas viewport supporting pan, zoom, and layer interaction.
+ */
+
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Columns2, Grid3x3 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
@@ -56,7 +60,6 @@ function EditStage() {
 
   const [zoom, setZoomState] = useState(1);
 
-  // Fit the frame inside the stage, leaving room for the HUD strip on wider screens.
   const ratio = base ? base.width / base.height : 1;
   const fitWidth = Math.min(stage.width || 800, (stage.height || 600) * ratio);
   const frame = { width: fitWidth, height: fitWidth / ratio };
@@ -69,7 +72,6 @@ function EditStage() {
     setZoomState(z);
   };
 
-  // Reset view when the image or crop changes.
   useEffect(() => {
     transformRef.current?.resetTransform();
     setZoomState(1);
@@ -83,7 +85,6 @@ function EditStage() {
     canvas.getContext('2d').drawImage(base, 0, 0);
   }, [base]);
 
-  // Re-paint once web fonts used by text layers have loaded.
   const [fontsReady, setFontsReady] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +94,6 @@ function EditStage() {
     };
   }, [layers]);
 
-  // Adjusted photo → background replacement → layers.
   useEffect(() => {
     if (!afterRef.current || !output.width) return;
     compose(afterRef.current, { photo: output, mask: maskBase, background, layers, assets: assets.map });

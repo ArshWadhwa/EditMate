@@ -1,12 +1,11 @@
+/**
+ * Individual slider control for tuning a specific image adjustment parameter.
+ */
+
 import { memo } from 'react';
 import { signed } from '../../lib/format.js';
 import { cx } from '../../components/ui.jsx';
 
-/**
- * One adjustment row. Bipolar ranges fill from the centre, unipolar ranges from the left.
- * Each drag is a single undo step: values preview on input and commit on release.
- * Double-click the label or value to reset.
- */
 export const AdjustmentSlider = memo(function AdjustmentSlider({ adjustment, value, focused, onPreview, onCommit, onFocus, onReset }) {
   const { key, label, min, max } = adjustment;
   const pos = ((value - min) / (max - min)) * 100;

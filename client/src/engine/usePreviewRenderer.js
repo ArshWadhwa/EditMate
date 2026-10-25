@@ -1,16 +1,12 @@
+/**
+ * Hook managing Web Worker rendering and canvas blitting for live preview.
+ */
+
 import { useEffect, useState } from 'react';
 import { readPixels } from './geometry.js';
 import { applyAdjustments, computeHistogram } from './pipeline.js';
 import { measure } from './analysis.js';
 
-/**
- * React hook that renders adjustment previews and calculates frame statistics
- * directly to an offscreen canvas.
- *
- * @param {HTMLCanvasElement|null} base - Geometrically transformed base image
- * @param {object} adjustments - Current adjustment slider values
- * @returns {{ frame: { histogram: object|null, stats: object|null, sourceStats: object|null, id: number }, output: HTMLCanvasElement }}
- */
 export function usePreviewRenderer(base, adjustments) {
   const [frame, setFrame] = useState({ histogram: null, stats: null, sourceStats: null, id: 0 });
   const [output] = useState(() => document.createElement('canvas'));

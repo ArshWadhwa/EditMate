@@ -1,3 +1,7 @@
+/**
+ * Context provider managing reference photo analysis and style matching.
+ */
+
 import { createContext, useContext } from 'react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { useToast } from '../../components/Toaster.jsx';
@@ -5,7 +9,6 @@ import { useInspiration } from './useInspiration.js';
 
 const InspirationContext = createContext(null);
 
-/** Lives above the dock so the reference survives switching between Inspire and Presets. */
 export function InspirationProvider({ children }) {
   const { base, thumbnail } = useEditor();
   const toast = useToast();

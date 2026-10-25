@@ -1,3 +1,7 @@
+/**
+ * Express application factory configuring middleware, routes, and error handling.
+ */
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

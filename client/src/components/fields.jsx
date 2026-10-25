@@ -1,6 +1,9 @@
+/**
+ * Reusable input field components for sliders, colors, and numbers.
+ */
+
 import { cx } from './ui.jsx';
 
-/** Labelled range slider used by layer and background properties. */
 export function RangeField({ label, value, min, max, step = 1, format = (v) => v, onChange, onCommit }) {
   const pos = ((value - min) / (max - min)) * 100;
   return (
@@ -28,10 +31,6 @@ export function RangeField({ label, value, min, max, step = 1, format = (v) => v
 
 const SWATCHES = ['#ffffff', '#111113', '#f4d35e', '#e5484d', '#5ac8fa', '#34d399', '#f4f1ea', '#a78bfa'];
 
-/**
- * Swatches plus a native colour picker. `value` may be null when `allowNone` is set.
- * The picker streams values while dragging: pass `onLive` + `onCommit` to make that one undo step.
- */
 export function ColorField({ label, value, onChange, onLive, onCommit, allowNone = false }) {
   return (
     <div>

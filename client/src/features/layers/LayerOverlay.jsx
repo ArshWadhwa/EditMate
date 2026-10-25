@@ -1,10 +1,13 @@
+/**
+ * Interactive canvas overlay for selecting, moving, and resizing layers.
+ */
+
 import { useEffect, useRef } from 'react';
 import { Canvas, Rect, FabricObject } from 'fabric';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { layoutText } from '../../engine/layers.js';
 import { useLayerActions } from './useLayerActions.js';
 
-// Configure default control styling for Fabric objects
 FabricObject.ownDefaults.borderColor = '#5ac8fa';
 FabricObject.ownDefaults.cornerColor = '#ffffff';
 FabricObject.ownDefaults.cornerStrokeColor = '#0284c7';
@@ -13,10 +16,6 @@ FabricObject.ownDefaults.transparentCorners = false;
 FabricObject.ownDefaults.cornerStyle = 'rect';
 FabricObject.ownDefaults.lockScalingFlip = true;
 
-/**
- * Interactive layer overlay powered by Fabric.js.
- * Provides transform handles, rotation controls, and bounding box selection for canvas layers.
- */
 export function LayerOverlay({ zoom }) {
   const { base, setUi } = useEditor();
   const { layers, selected, select, previewUpdate, commit, update } = useLayerActions();
@@ -27,7 +26,6 @@ export function LayerOverlay({ zoom }) {
   const W = base?.width || 1;
   const H = base?.height || 1;
 
-  // Initialize Fabric Canvas
   useEffect(() => {
     const el = canvasElRef.current;
     if (!el || !base) return;
@@ -40,7 +38,6 @@ export function LayerOverlay({ zoom }) {
     });
     fabricRef.current = canvas;
 
-    // Selection events
     canvas.on('selection:created', (e) => {
       const target = e.selected?.[0];
       if (target?.layerId) select(target.layerId);
@@ -53,7 +50,6 @@ export function LayerOverlay({ zoom }) {
       select(null);
     });
 
-    // Live gesture updates
     canvas.on('object:moving', (e) => {
       const obj = e.target;
       if (!obj?.layerId) return;
@@ -68,7 +64,6 @@ export function LayerOverlay({ zoom }) {
       previewUpdate(obj.layerId, { rotation: Math.round(obj.angle % 360) });
     });
 
-    // Gesture committed (move, rotate, scale end)
     canvas.on('object:modified', (e) => {
       const obj = e.target;
       if (!obj?.layerId) return;
@@ -101,7 +96,6 @@ export function LayerOverlay({ zoom }) {
       }, 50);
     });
 
-    // Double-click text/shape to inspect layer options
     canvas.on('mouse:dblclick', (e) => {
       if (e.target?.layerId) {
         select(e.target.layerId);
@@ -118,7 +112,6 @@ export function LayerOverlay({ zoom }) {
     };
   }, [base, W, H]);
 
-  // Adjust corner size with zoom level
   useEffect(() => {
     if (fabricRef.current) {
       fabricRef.current.calcOffset();
@@ -130,7 +123,6 @@ export function LayerOverlay({ zoom }) {
     }
   }, [zoom]);
 
-  // Populate Fabric objects from document layers
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas || !base) return;
@@ -156,7 +148,7 @@ export function LayerOverlay({ zoom }) {
         originX: 'center',
         originY: 'center',
         angle: layer.rotation || 0,
-        fill: 'rgba(0, 0, 0, 0.001)', // captures pointer events while transparent
+        fill: 'rgba(0, 0, 0, 0.001)', 
         stroke: 'transparent',
         hasControls: true,
         hasBorders: true,
@@ -175,7 +167,6 @@ export function LayerOverlay({ zoom }) {
     canvas.requestRenderAll();
   }, [layers, base, selected?.id, W, H, zoom]);
 
-  // Sync external selection (e.g. clicked in sidebar)
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;

@@ -9,13 +9,22 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:4000',
     },
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
   },
   worker: {
     format: 'es',
   },
   optimizeDeps: {
-    // Background removal is imported lazily; pre-bundle it at startup so the first click
-    // doesn't trigger a dependency re-optimisation (and a stale-module error) in dev.
     include: ['@imgly/background-removal'],
+    exclude: ['@huggingface/transformers'],
+    esbuildOptions: {
+      target: 'es2022',
+    },
+  },
+  build: {
+    target: 'es2022',
   },
 });

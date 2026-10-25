@@ -1,24 +1,16 @@
+/**
+ * Image analysis, statistical measurement, and recipe-matching optimizer.
+ */
+
 import { ADJUSTMENTS, clampAdjustment, defaultAdjustments } from '@editmate/shared';
 import { colord } from 'colord';
 import { applyAdjustments } from './pipeline.js';
 import { readPixels } from './geometry.js';
 
-/**
- * Image analysis, statistical measurement, and recipe-matching optimizer.
- */
-
 const LUM_R = 0.2126;
 const LUM_G = 0.7152;
 const LUM_B = 0.0722;
 
-/**
- * Computes the p-th percentile from a cumulative luminance histogram.
- *
- * @param {Uint32Array} histogram
- * @param {number} total - Total sample count
- * @param {number} p - Percentile in [0, 1]
- * @returns {number} Normalized luminance value in [0, 1]
- */
 function percentile(histogram, total, p) {
   const target = total * p;
   let acc = 0;
@@ -29,16 +21,6 @@ function percentile(histogram, total, p) {
   return 1;
 }
 
-/**
- * Extracts perceptual and tonal statistics from an RGBA pixel buffer.
- *
- * @param {Uint8ClampedArray} data - RGBA pixel array
- * @param {number} width - Image width in pixels
- * @param {number} height - Image height in pixels
- * @param {object} [options]
- * @param {number} [options.sampleTarget=Infinity] - Approximate target pixel sample budget
- * @returns {{ brightness: number, contrast: number, saturation: number, warmth: number, tint: number, shadows: number, highlights: number, blackPoint: number, falloff: number }}
- */
 export function measure(data, width, height, { sampleTarget = Infinity } = {}) {
   const pixels = width * height;
   const step = Math.max(1, Math.floor(Math.sqrt(pixels / sampleTarget)));
@@ -107,14 +89,6 @@ export function measure(data, width, height, { sampleTarget = Infinity } = {}) {
   };
 }
 
-/**
- * Estimates high-frequency texture noise using the median absolute Laplacian of luminance.
- *
- * @param {Uint8ClampedArray} data
- * @param {number} width
- * @param {number} height
- * @returns {number} Estimated noise level in [0, 255]
- */
 export function measureNoise(data, width, height) {
   const lum = new Float32Array(width * height);
   for (let p = 0, i = 0; p < lum.length; p++, i += 4) {
@@ -134,9 +108,6 @@ export function measureNoise(data, width, height) {
   return total ? percentile(bins, total, 0.5) * 255 : 0;
 }
 
-/**
- * Mapping between measurable tonal statistics and their corresponding adjustment parameters.
- */
 export const FIT_DIMENSIONS = [
   { stat: 'brightness', key: 'brightness', scale: 0.05 },
   { stat: 'contrast', key: 'contrast', scale: 0.04 },
@@ -153,13 +124,6 @@ const RANGE = Object.fromEntries(ADJUSTMENTS.map((a) => [a.key, a]));
 const LAMBDA = 0.08;
 const MU = 2e-4;
 
-/**
- * Solves a linear system Ax = b using Gaussian elimination with partial pivoting.
- *
- * @param {number[][]} A
- * @param {number[]} b
- * @returns {number[]} Solution vector x
- */
 function solve(A, b) {
   const n = b.length;
   const M = A.map((row, i) => [...row, b[i]]);
@@ -182,18 +146,6 @@ function solve(A, b) {
   return x;
 }
 
-/**
- * Optimizes adjustment values to match source image statistics to a target reference profile
- * using damped Gauss-Newton optimization with finite-difference Jacobian estimation.
- *
- * @param {object} params
- * @param {{ data: Uint8ClampedArray, width: number, height: number }} params.source
- * @param {Record<string, number>} params.target
- * @param {object} [params.base]
- * @param {string[]} [params.keys]
- * @param {number} [params.iterations=8]
- * @returns {{ adjustments: object, matchBefore: number, matchAfter: number }}
- */
 export function fitAdjustments({ source, target, base = defaultAdjustments(), keys, iterations = 8 }) {
   const dims = FIT_DIMENSIONS.filter((d) => target[d.stat] !== undefined && (!keys || keys.includes(d.key)));
   const free = dims.map((d) => d.key);
@@ -285,23 +237,10 @@ function rms(values) {
 
 const matchScore = (error) => Math.round(100 * Math.exp(-error / 3));
 
-/**
- * Estimates recommended film grain adjustment based on relative texture differences.
- *
- * @param {number} referenceNoise
- * @param {number} photoNoise
- * @returns {number}
- */
 export function suggestGrain(referenceNoise, photoNoise) {
   return clampAdjustment('grain', Math.max(0, (referenceNoise - photoNoise) * 2));
 }
 
-/**
- * Classifies the visual color style of an image based on measured metrics.
- *
- * @param {object} m - Measured image statistics
- * @returns {string} Style label
- */
 export function classifyStyle(m) {
   if (m.saturation < 0.05) return m.contrast > 0.22 ? 'Noir' : 'Monochrome';
   if (m.blackPoint > 0.07 && m.contrast < 0.2) return 'Faded film';
@@ -313,13 +252,6 @@ export function classifyStyle(m) {
   return 'Clean editorial';
 }
 
-/**
- * Extracts dominant palette colors using uniform 4-bit quantization and Euclidean distance filtering.
- *
- * @param {Uint8ClampedArray} data - RGBA pixel buffer
- * @param {number} [count=5] - Number of palette colors to extract
- * @returns {string[]} Hex color codes
- */
 export function extractPalette(data, count = 5) {
   const buckets = new Map();
   for (let i = 0; i < data.length; i += 16) {
@@ -352,13 +284,6 @@ export function extractPalette(data, count = 5) {
 const TONE_KEYS = ['brightness', 'contrast', 'highlights', 'shadows'];
 const clampVal = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-/**
- * Computes optimal exposure and contrast adjustments for an image.
- *
- * @param {HTMLCanvasElement} thumbnail
- * @param {object} current - Current adjustments
- * @returns {object} Fitted adjustments
- */
 export function autoTone(thumbnail, current) {
   const source = readPixels(thumbnail);
   const m = measure(source.data, source.width, source.height);
@@ -372,13 +297,6 @@ export function autoTone(thumbnail, current) {
   return fitAdjustments({ source, target, base, keys: TONE_KEYS }).adjustments;
 }
 
-/**
- * Computes white balance adjustments to neutralize average color cast (Gray-world assumption).
- *
- * @param {HTMLCanvasElement} thumbnail
- * @param {object} current
- * @returns {object}
- */
 export function autoWhiteBalance(thumbnail, current) {
   const source = readPixels(thumbnail);
   const base = { ...current, warmth: 0, tint: 0 };

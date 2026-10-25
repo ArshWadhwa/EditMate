@@ -1,3 +1,7 @@
+/**
+ * Generates human-readable descriptions of adjustments applied by a recipe.
+ */
+
 const INTENTS = {
   brightness: ['Lift the overall exposure', 'Bring exposure down'],
   contrast: ['Stronger light/dark separation', 'Softer, flatter tones'],
@@ -17,7 +21,6 @@ export function describeIntent(key, value) {
   return value >= 0 ? up : down;
 }
 
-/** The recipe's most significant moves, largest first. */
 export function significantSteps(adjustments, limit = 6) {
   return Object.entries(adjustments)
     .filter(([, value]) => Math.abs(value) >= 3)

@@ -1,3 +1,7 @@
+/**
+ * Panel for aspect ratio selection, rotation, and crop confirmation.
+ */
+
 import { Check, FlipHorizontal2, Maximize, RectangleHorizontal, RectangleVertical, RotateCcw, RotateCcwSquare, RotateCwSquare } from 'lucide-react';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { isDefaultGeometry } from '../../engine/geometry.js';
@@ -26,7 +30,6 @@ export function CropPanel() {
   const { rotateLeft, rotateRight, flip } = useGeometryActions();
 
   const canSwap = ratio && ratio[0] !== ratio[1];
-  // The selected preset shows its current orientation (e.g. 3:2 becomes 2:3 after a swap).
   const labelFor = ({ key, label }) => label ?? (aspectKey === key ? `${ratio[0]}:${ratio[1]}` : key);
 
   return (

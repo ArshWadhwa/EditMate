@@ -18,6 +18,7 @@ const SHORTCUTS_LEFT = [
   ['Crop & rotate tool', ['R']],
   ['Background tool', ['B']],
   ['Layers panel', ['L']],
+  ['Presets library popup', ['P']],
 ];
 
 const SHORTCUTS_RIGHT = [

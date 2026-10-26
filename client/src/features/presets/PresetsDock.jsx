@@ -3,7 +3,7 @@
  */
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { BookmarkPlus, LoaderCircle, Trash2 } from 'lucide-react';
+import { BookmarkPlus, LayoutGrid, LoaderCircle, Trash2 } from 'lucide-react';
 import { ADJUSTMENT_KEYS } from '@editmate/shared';
 import { useEditor } from '../../state/EditorProvider.jsx';
 import { applyAdjustments } from '../../engine/pipeline.js';
@@ -13,7 +13,7 @@ import { usePresets } from './PresetsProvider.jsx';
 
 const sameAdjustments = (a, b) => ADJUSTMENT_KEYS.every((k) => a[k] === b[k]);
 
-const PresetThumb = memo(function PresetThumb({ source, adjustments }) {
+export const PresetThumb = memo(function PresetThumb({ source, adjustments }) {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -81,7 +81,7 @@ function PresetCard({ preset, source, active, onApply, onDelete }) {
 
 export function PresetsDock({ onSavePreset }) {
   const { thumbnail, adjustments, apply, adjustmentsPristine: isPristine } = useEditor();
-  const { builtIn, saved, loading, canSave, status, deletePreset } = usePresets();
+  const { builtIn, saved, loading, canSave, status, deletePreset, openAllPresets } = usePresets();
   const source = useMemo(() => (thumbnail ? readPixels(thumbnail) : null), [thumbnail]);
 
   const onApply = (preset) => apply({ adjustments: preset.adjustments });
@@ -95,8 +95,23 @@ export function PresetsDock({ onSavePreset }) {
       ? 'Make an edit first'
       : 'Save current look';
 
+  const totalCount = builtIn.length + saved.length;
+
   return (
     <div className="scrollbar-none -my-1 flex min-w-0 flex-1 items-start gap-3 overflow-x-auto py-1">
+      <button
+        type="button"
+        onClick={openAllPresets}
+        className="group flex aspect-[124/127] w-[124px] shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-center transition-all hover:border-accent/40 hover:bg-white/[0.07] hover:shadow-lg hover:shadow-black/20"
+        title="Open all presets in a popup window"
+      >
+        <div className="grid size-9 place-items-center rounded-xl bg-accent/15 text-accent transition-transform duration-200 group-hover:scale-110">
+          <LayoutGrid className="size-5" />
+        </div>
+        <span className="text-[12px] font-bold text-white group-hover:text-accent transition-colors">All presets</span>
+        <span className="text-[10px] leading-tight text-white/40">Browse library ({totalCount})</span>
+      </button>
+
       <button
         type="button"
         onClick={() => onSavePreset()}

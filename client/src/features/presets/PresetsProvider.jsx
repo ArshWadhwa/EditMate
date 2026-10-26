@@ -50,9 +50,26 @@ export function PresetsProvider({ children }) {
     [saved, toast],
   );
 
+  const [allPresetsOpen, setAllPresetsOpen] = useState(false);
+
+  const openAllPresets = useCallback(() => setAllPresetsOpen(true), []);
+  const closeAllPresets = useCallback(() => setAllPresetsOpen(false), []);
+
   const value = useMemo(
-    () => ({ status, builtIn: BUILT_IN_PRESETS, saved, loading, canSave: status === 'online', savePreset, deletePreset }),
-    [status, saved, loading, savePreset, deletePreset],
+    () => ({
+      status,
+      builtIn: BUILT_IN_PRESETS,
+      saved,
+      loading,
+      canSave: status === 'online',
+      savePreset,
+      deletePreset,
+      allPresetsOpen,
+      openAllPresets,
+      closeAllPresets,
+      setAllPresetsOpen,
+    }),
+    [status, saved, loading, savePreset, deletePreset, allPresetsOpen, openAllPresets, closeAllPresets],
   );
 
   return <PresetsContext.Provider value={value}>{children}</PresetsContext.Provider>;

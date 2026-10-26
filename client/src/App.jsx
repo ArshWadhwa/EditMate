@@ -8,7 +8,8 @@ import { ToastProvider } from './components/Toaster.jsx';
 import { ShortcutsDialog } from './components/ShortcutsDialog.jsx';
 import { Panel, cx } from './components/ui.jsx';
 import { EditorProvider, useEditor } from './state/EditorProvider.jsx';
-import { PresetsProvider } from './features/presets/PresetsProvider.jsx';
+import { PresetsProvider, usePresets } from './features/presets/PresetsProvider.jsx';
+import { AllPresetsDialog } from './features/presets/AllPresetsDialog.jsx';
 import { InspirationProvider } from './features/inspire/InspirationProvider.jsx';
 import { CropProvider, useCrop } from './features/crop/CropProvider.jsx';
 import { Rail } from './features/rail/Rail.jsx';
@@ -48,6 +49,7 @@ export default function App() {
 function Editor() {
   const editor = useEditor();
   const { image, ui, setUi, openFile } = editor;
+  const { allPresetsOpen, openAllPresets, closeAllPresets } = usePresets();
   const crop = useCrop();
   const focus = useFocusNavigation();
   const layerActions = useLayerActions();
@@ -67,6 +69,7 @@ function Editor() {
   useHotkeys('mod+e', (e) => { e.preventDefault(); if (image) editor.exportImage(); });
   useHotkeys('mod+d', (e) => { e.preventDefault(); if (image && layerActions.selected) layerActions.duplicate(layerActions.selected.id); });
   useHotkeys('shift+/', () => setShortcutsOpen(true));
+  useHotkeys('p', () => openAllPresets());
 
   useHotkeys('c', () => image && setUi((u) => ({ compare: !u.compare })));
   useHotkeys('g', () => image && setUi((u) => ({ grid: !u.grid })));
@@ -159,6 +162,7 @@ function Editor() {
 
       <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <SavePresetDialog draft={presetDraft} onClose={() => setPresetDraft(null)} />
+      <AllPresetsDialog open={allPresetsOpen} onClose={closeAllPresets} onSavePreset={savePreset} />
     </div>
   );
 }
